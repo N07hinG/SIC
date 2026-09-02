@@ -389,6 +389,48 @@
     .form-grid{grid-template-columns:1fr;}
     .op-row{grid-template-columns:80px repeat(8,minmax(60px,1fr));overflow-x:auto;}
   }
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  @media (max-width:600px){
+    main{padding:12px;}
+    .board{padding:16px 14px;border-radius:10px;}
+    .trend-card{padding:16px 14px;border-radius:10px;}
+    .board-head{flex-wrap:wrap;row-gap:6px;}
+    .board-head .title{order:3;width:100%;text-align:left;font-size:15.5px;}
+    .board-head .abi{font-size:14.5px;}
+    .board-head .vpo{font-size:13px;}
+    .accent-bar{margin:10px 0 12px;}
+    .info-mini .row .k{width:56px;font-size:12px;}
+    .info-mini .row .v{font-size:12px;}
+    .info-monitoreo{font-size:12.5px;padding:8px 6px;}
+    .info-total .num{font-size:24px;}
+    .monitoreo-line{font-size:12px;margin:10px 0 8px;}
+    .controls-row{gap:8px;}
+    .control{flex:1 1 130px;}
+    .control select{min-width:0;width:100%;font-size:13px;}
+    .btn-status{width:100%;justify-content:center;}
+    .op-row{grid-template-columns:64px repeat(8,minmax(46px,1fr));font-size:10.5px;}
+    .op-row > div{padding:5px 3px;}
+    .op-row .lbl{padding-left:5px;font-size:10.5px;}
+    .op-row .val{font-size:11.5px;}
+    .op-row .hora{font-size:9.5px;}
+    .planes-hdr,.plan-row{grid-template-columns:26px 78px 1fr;font-size:12px;}
+    .planes-hdr > div,.plan-row > div{padding:5px 5px;}
+    .plan-row select.plan-tipo-input{font-size:10.5px;padding:5px 3px;}
+    .plan-row input.plan-accion-input{font-size:12px;padding:5px 4px;}
+    table.edit-table{font-size:11.5px;min-width:520px;}
+    table.edit-table input{width:44px;font-size:12px;padding:4px 2px;}
+    #editPanel h3{font-size:14px;}
+    .trend-head h3{font-size:13.5px;}
+    .topbar{padding:0 10px;}
+    .side-menu{width:88vw;max-width:270px;}
+    table.hours-table,table.plans-table{min-width:520px;}
+    .db-form{padding:16px 14px;}
+    .form-actions{flex-wrap:wrap;}
+    .form-actions .btn{flex:1 1 auto;}
+    .status-modal{max-width:92vw;padding:20px 18px 16px;}
+  }
 </style>
 </head>
 <body>
@@ -535,15 +577,19 @@
             <div class="f-field"><label>Total planificado</label><input type="number" id="f_total" placeholder="74"></div>
           </div>
 
-          <table class="hours-table">
-            <thead><tr><th>Hora</th><th>Meta acum. (%)</th><th>Programado</th><th>Armados</th><th>Cargados</th></tr></thead>
-            <tbody id="hoursBody"></tbody>
-          </table>
+          <div class="table-scroll">
+            <table class="hours-table">
+              <thead><tr><th>Hora</th><th>Meta acum. (%)</th><th>Programado</th><th>Armados</th><th>Cargados</th></tr></thead>
+              <tbody id="hoursBody"></tbody>
+            </table>
+          </div>
 
-          <table class="plans-table">
-            <thead><tr><th style="width:34px">#</th><th style="width:130px">Tipo</th><th>Accion</th></tr></thead>
-            <tbody id="plansBody"></tbody>
-          </table>
+          <div class="table-scroll">
+            <table class="plans-table">
+              <thead><tr><th style="width:34px">#</th><th style="width:130px">Tipo</th><th>Accion</th></tr></thead>
+              <tbody id="plansBody"></tbody>
+            </table>
+          </div>
 
           <div class="form-actions">
             <button class="btn btn-danger" id="deleteBtn">Eliminar fecha</button>
@@ -634,18 +680,39 @@ function seedData(){
 }
 
 /* ---------- almacenamiento persistente ---------- */
+/* Usa window.storage cuando corre dentro de Claude (sincroniza entre dispositivos de la misma cuenta).
+   Si no esta disponible (por ejemplo, alojado en GitHub Pages), usa localStorage del navegador
+   como respaldo: los datos se guardan, pero quedan solo en ese navegador/dispositivo. */
+const HAS_CLAUDE_STORAGE = (typeof window!=="undefined" && !!window.storage);
+const LS_PREFIX = "t2sic:fecha:";
+
 async function loadDB(){
   try{
-    const list = await window.storage.list("fecha:", false);
-    if(list && list.keys && list.keys.length){
-      for(const k of list.keys){
-        try{
-          const r = await window.storage.get(k, false);
-          if(r && r.value){
-            const fecha = k.replace("fecha:","");
-            DB[fecha] = JSON.parse(r.value);
-          }
-        }catch(e){}
+    if(HAS_CLAUDE_STORAGE){
+      const list = await window.storage.list("fecha:", false);
+      if(list && list.keys && list.keys.length){
+        for(const k of list.keys){
+          try{
+            const r = await window.storage.get(k, false);
+            if(r && r.value){
+              const fecha = k.replace("fecha:","");
+              DB[fecha] = JSON.parse(r.value);
+            }
+          }catch(e){}
+        }
+      }
+    } else {
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.indexOf(LS_PREFIX)===0){
+          try{
+            const val = localStorage.getItem(k);
+            if(val){
+              const fecha = k.slice(LS_PREFIX.length);
+              DB[fecha] = JSON.parse(val);
+            }
+          }catch(e){}
+        }
       }
     }
   }catch(e){}
@@ -655,10 +722,22 @@ async function loadDB(){
   }
 }
 async function persistDate(fecha){
-  try{ await window.storage.set("fecha:"+fecha, JSON.stringify(DB[fecha]), false); }catch(e){}
+  try{
+    if(HAS_CLAUDE_STORAGE){
+      await window.storage.set("fecha:"+fecha, JSON.stringify(DB[fecha]), false);
+    } else {
+      localStorage.setItem(LS_PREFIX+fecha, JSON.stringify(DB[fecha]));
+    }
+  }catch(e){}
 }
 async function deletePersisted(fecha){
-  try{ await window.storage.delete("fecha:"+fecha, false); }catch(e){}
+  try{
+    if(HAS_CLAUDE_STORAGE){
+      await window.storage.delete("fecha:"+fecha, false);
+    } else {
+      localStorage.removeItem(LS_PREFIX+fecha);
+    }
+  }catch(e){}
 }
 
 /* ---------- LOGIN ---------- */
@@ -840,20 +919,22 @@ function renderEditPanel(){
   panel.innerHTML = `
     <h3>Editar datos — ${fmtDMY(currentFecha)}</h3>
     <div class="hint">Los cambios se reflejan de inmediato en el grafico y quedan guardados.</div>
-    <table class="edit-table">
-      <thead><tr><th>Hora</th><th>Meta (%)</th><th>Programado</th><th>Armados</th><th>Cargados</th><th>% Real</th></tr></thead>
-      <tbody>
-        ${rec.horas.map((h,i)=>`
-          <tr>
-            <td class="hora-cell">${HORAS[i]}</td>
-            <td><input type="number" min="0" max="100" data-idx="${i}" data-field="meta" value="${h.meta}"></td>
-            <td><input type="number" min="0" data-idx="${i}" data-field="programado" value="${h.programado||0}"></td>
-            <td><input type="number" min="0" data-idx="${i}" data-field="armados" value="${h.armados||0}"></td>
-            <td><input type="number" min="0" data-idx="${i}" data-field="camiones" value="${h.camiones}"></td>
-            <td class="pct-cell">${Math.round(pct[i])}%</td>
-          </tr>`).join("")}
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="edit-table">
+        <thead><tr><th>Hora</th><th>Meta (%)</th><th>Programado</th><th>Armados</th><th>Cargados</th><th>% Real</th></tr></thead>
+        <tbody>
+          ${rec.horas.map((h,i)=>`
+            <tr>
+              <td class="hora-cell">${HORAS[i]}</td>
+              <td><input type="number" min="0" max="100" data-idx="${i}" data-field="meta" value="${h.meta}"></td>
+              <td><input type="number" min="0" data-idx="${i}" data-field="programado" value="${h.programado||0}"></td>
+              <td><input type="number" min="0" data-idx="${i}" data-field="armados" value="${h.armados||0}"></td>
+              <td><input type="number" min="0" data-idx="${i}" data-field="camiones" value="${h.camiones}"></td>
+              <td class="pct-cell">${Math.round(pct[i])}%</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
   panel.querySelectorAll("input[data-field]").forEach(inp=>{
     inp.addEventListener("input", onEditInput);
