@@ -140,7 +140,7 @@
   .btn-row{display:flex;gap:10px;margin-top:4px;}
   .btn-row .btn{width:auto;flex:1;}
 
-  .chart-wrap{position:relative;height:220px;}
+  .chart-wrap{position:relative;height:250px;}
   .estado-fila{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
   .dot{width:10px;height:10px;border-radius:50%;}
   .estado-txt{font-size:12.5px;color:var(--text-soft);}
@@ -271,8 +271,8 @@
 
       <div class="fila-transp">
         <div class="caja-transp">
-          <label>TRANSPORTES PROGRAMADOS<span>(seg&uacute;n Programados)</span></label>
-          <input id="c-transportes" class="num" inputmode="numeric" value="74" readonly>
+          <label>TRANSPORTES PROGRAMADOS</label>
+          <input id="c-transportes" class="num" inputmode="numeric" value="74">
         </div>
         <div class="caja-estatus" id="btn-estatus">
           <span class="led"></span>
@@ -306,10 +306,6 @@
       <div class="panel-title">Editar datos</div>
       <div class="horas-grid" id="horas-grid"></div>
 
-      <div class="campo-dato">
-        <label>Programados</label>
-        <input id="d-programado" inputmode="numeric" value="0">
-      </div>
       <div class="campo-dato">
         <label>Armados</label>
         <input id="d-armado" inputmode="numeric" value="0">
@@ -372,14 +368,14 @@
       monitoreo:"Unidades cargadas x horas planificadas",
       transportesProgramados:74,
       horas:[
-        {hora:"11:00 pm", rojo:90, programado:0, armado:0, cargado:0},
-        {hora:"12:00 am", rojo:80, programado:0, armado:0, cargado:0},
-        {hora:"1:00 am",  rojo:70, programado:0, armado:0, cargado:0},
-        {hora:"2:00 am",  rojo:60, programado:0, armado:0, cargado:0},
-        {hora:"3:00 am",  rojo:50, programado:0, armado:0, cargado:0},
-        {hora:"4:00 am",  rojo:40, programado:0, armado:0, cargado:0},
-        {hora:"5:00 am",  rojo:25, programado:0, armado:0, cargado:0},
-        {hora:"6:00 am",  rojo:10, programado:0, armado:0, cargado:0}
+        {hora:"11:00 pm", armado:0, cargado:0},
+        {hora:"12:00 am", armado:0, cargado:0},
+        {hora:"1:00 am",  armado:0, cargado:0},
+        {hora:"2:00 am",  armado:0, cargado:0},
+        {hora:"3:00 am",  armado:0, cargado:0},
+        {hora:"4:00 am",  armado:0, cargado:0},
+        {hora:"5:00 am",  armado:0, cargado:0},
+        {hora:"6:00 am",  armado:0, cargado:0}
       ],
       planes:[
         {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
@@ -483,15 +479,12 @@
       estado.monitoreo = this.value; guardarEstado();
       document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
     };
-  }
-
-  /* Transportes Programados ya no se edita manualmente: siempre refleja
-     el valor de "Programados" de la hora seleccionada en Editar Datos. */
-  function sincronizarTransportes(){
-    var h = estado.horas[horaSelIdx];
-    estado.transportesProgramados = h.programado || 0;
-    document.getElementById("c-transportes").value = estado.transportesProgramados;
-    guardarEstado();
+    document.getElementById("c-transportes").oninput = function(){
+      estado.transportesProgramados = Number(this.value)||0;
+      guardarEstado();
+      dibujarGrafico();
+      actualizarMensaje();
+    };
   }
 
   /* ============== ESTATUS DE CARGA (mensaje) ============== */
@@ -501,12 +494,10 @@
     return "STATUS DE CARGA\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
       "Supervisor: " + (estado.supervisor || "-") + "\n" +
+      "Area: Logistica T2\n" +
       "Guion: " + (estado.guion || "-") + "\n" +
-      "Logistica: T2\n" +
-      "Subarea: " + (estado.subarea || "-") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
-      "Programados: " + (h.programado||0) + "\n" +
       "Armados: " + (h.armado||0) + "\n" +
       "Cargados: " + (h.cargado||0) + " / " + (estado.transportesProgramados||0) + "\n" +
       "Cumplimiento: " + pct + "%";
@@ -551,12 +542,12 @@
     window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
   });
 
-  /* ============== HORAS: SELECTOR + 3 CAMPOS ============== */
+  /* ============== HORAS: SELECTOR + 2 CAMPOS ============== */
   function renderHorasGrid(){
     var cont = document.getElementById("horas-grid");
     cont.innerHTML = "";
     estado.horas.forEach(function(h, i){
-      var tieneDatos = (h.programado||h.armado||h.cargado) ? true : false;
+      var tieneDatos = (h.armado||h.cargado) ? true : false;
       var btn = document.createElement("div");
       btn.className = "hora-btn" + (i === horaSelIdx ? " activa" : "");
       btn.innerHTML = escapeAttr(h.hora) + (tieneDatos ? '<span class="chk">&#10003;</span>' : '');
@@ -564,7 +555,6 @@
         horaSelIdx = i;
         renderHorasGrid();
         bindDatosHora();
-        sincronizarTransportes();
         dibujarGrafico();
         actualizarMensaje();
       });
@@ -574,17 +564,10 @@
 
   function bindDatosHora(){
     var h = estado.horas[horaSelIdx];
-    document.getElementById("d-programado").value = h.programado || 0;
     document.getElementById("d-armado").value = h.armado || 0;
     document.getElementById("d-cargado").value = h.cargado || 0;
   }
 
-  document.getElementById("d-programado").addEventListener("input", function(){
-    estado.horas[horaSelIdx].programado = Number(this.value)||0;
-    sincronizarTransportes();
-    dibujarGrafico();
-    actualizarMensaje();
-  });
   document.getElementById("d-armado").addEventListener("input", function(){
     estado.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje();
   });
@@ -638,7 +621,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    var padL = 30, padR = 6, padT = 8, padB = 22;
+    var padL = 30, padR = 6, padT = 8, padB = 46;
     var chartW = Math.max(10, cssW - padL - padR);
     var chartH = Math.max(10, cssH - padT - padB);
     var n = horas.length;
@@ -658,24 +641,26 @@
       ctx.fillText(Math.round(f*100) + "%", padL - 6, y);
     });
 
-    var redPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos((h.rojo||0)/100)}; });
-    var basePts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(0)}; });
-    var topPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(1)}; });
+    /* La zona roja/verde ahora es una ESCALERA calculada directamente del
+       dato real (pct) de cada hora: el limite entre rojo y verde para el
+       tramo [hora i, hora i+1) es el propio valor de esa hora. Como el
+       punto de esa hora vale exactamente eso, el punto siempre queda
+       justo en el borde o por encima -> nunca cae en zona roja. */
     var pctPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(h.pct||0)}; });
 
-    ctx.beginPath();
-    basePts.forEach(function(p,i){ i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); });
-    for(var i=redPts.length-1;i>=0;i--){ ctx.lineTo(redPts[i].x, redPts[i].y); }
-    ctx.closePath();
-    ctx.fillStyle = "rgba(229,72,77,0.85)";
-    ctx.fill();
-
-    ctx.beginPath();
-    redPts.forEach(function(p,i){ i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); });
-    for(var j=topPts.length-1;j>=0;j--){ ctx.lineTo(topPts[j].x, topPts[j].y); }
-    ctx.closePath();
-    ctx.fillStyle = "rgba(51,214,137,0.85)";
-    ctx.fill();
+    for(var s=0; s<n; s++){
+      var xa = xPos(s);
+      var xb = (s < n-1) ? xPos(s+1) : (padL + chartW);
+      var yLimite = yPos(horas[s].pct||0);
+      var yTop = yPos(1);
+      var yBase = yPos(0);
+      // bloque rojo (0 .. pct de esta hora)
+      ctx.fillStyle = "rgba(229,72,77,0.85)";
+      ctx.fillRect(xa, yLimite, xb-xa, yBase-yLimite);
+      // bloque verde (pct .. 100%)
+      ctx.fillStyle = "rgba(51,214,137,0.85)";
+      ctx.fillRect(xa, yTop, xb-xa, yLimite-yTop);
+    }
 
     if(pctPts.length){
       ctx.beginPath();
@@ -697,23 +682,29 @@
       });
     }
 
+    // Etiquetas de hora en el eje X, en VERTICAL para que no se amontonen.
     ctx.fillStyle = "#8d99a3";
-    ctx.font = "9px Inter, sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "top";
-    var minSpacing = 30;
-    var step = Math.max(1, Math.ceil((n * minSpacing) / Math.max(chartW,1)));
+    ctx.font = "8.5px Inter, sans-serif";
     horas.forEach(function(h,i){
-      if(i % step === 0 || i === n-1){ ctx.fillText(h.hora, xPos(i), padT + chartH + 5); }
+      var x = xPos(i);
+      var y = padT + chartH + 6;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI/2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(h.hora, 0, 0);
+      ctx.restore();
     });
 
-    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, rojo:0, cargado:0};
+    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, cargado:0};
     var pctUlt = Math.round((actual.pct||0)*100);
     var dot = document.getElementById("estado-dot");
     var txt = document.getElementById("estado-txt");
     var pctEl = document.getElementById("estado-pct");
     var color, mensaje;
     if(pctUlt >= 90){ color="var(--verde)"; mensaje="En verde, dentro de meta"; }
-    else if(pctUlt >= (actual.rojo||0)){ color="var(--amber)"; mensaje="En rango de alerta"; }
+    else if(pctUlt >= 50){ color="var(--amber)"; mensaje="En rango de alerta"; }
     else { color="var(--rojo)"; mensaje="En rojo, requiere plan de reacci\u00f3n"; }
     dot.style.background = color;
     txt.textContent = mensaje;
@@ -757,7 +748,6 @@
       area: estado.area,
       guion: estado.guion,
       transportesProgramados: estado.transportesProgramados,
-      programado: h.programado||0,
       armado: h.armado||0,
       cargado: h.cargado||0,
       pct: pct
@@ -794,7 +784,6 @@
         if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" al editor?")){
           var idx = estado.horas.findIndex(function(h){ return h.hora === r.hora; });
           if(idx >= 0){
-            estado.horas[idx].programado = r.programado;
             estado.horas[idx].armado = r.armado;
             estado.horas[idx].cargado = r.cargado;
             horaSelIdx = idx;
@@ -823,7 +812,6 @@
     bindCabecera();
     renderHorasGrid();
     bindDatosHora();
-    sincronizarTransportes();
     renderPlanes();
     dibujarGrafico();
     renderHistorico();
