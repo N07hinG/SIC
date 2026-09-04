@@ -249,6 +249,7 @@
   <div class="topbar">
     <div class="brand"><span class="t2" style="color:var(--amber)">T2</span> SIC</div>
     <div class="topbar-actions">
+      <button class="icon-btn" id="btn-reset" title="Reiniciar todo (nuevo reporte)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
     </div>
   </div>
@@ -361,22 +362,44 @@
   var estado = null;
   var horaSelIdx = 0;
 
+  var TURNO_INICIO = {
+    "Turno 1 - Ma\u00f1ana": 7,   // 7:00 am a 3:00 pm
+    "Turno 2 - Tarde": 15,     // 3:00 pm a 11:00 pm
+    "Turno 3 - Nocturno": 23   // 11:00 pm a 7:00 am
+  };
+
+  function horaLabel(h24){
+    var h = ((h24 % 24) + 24) % 24;
+    var periodo = h < 12 ? "am" : "pm";
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ":00 " + periodo;
+  }
+
+  function generarHorasPorTurno(turno){
+    var inicio = (turno && TURNO_INICIO.hasOwnProperty(turno)) ? TURNO_INICIO[turno] : TURNO_INICIO["Turno 3 - Nocturno"];
+    var horas = [];
+    for(var i=0; i<8; i++){
+      horas.push({ hora: horaLabel(inicio + i), armado:0, cargado:0 });
+    }
+    return horas;
+  }
+
+  function horasCoincidenConTurno(horas, turno){
+    var esperadas = generarHorasPorTurno(turno);
+    if(!horas || horas.length !== esperadas.length) return false;
+    for(var i=0; i<esperadas.length; i++){
+      if(horas[i].hora !== esperadas[i].hora) return false;
+    }
+    return true;
+  }
+
   function datosPorDefecto(){
     return {
       turno:"", supervisor:"",
       subarea:"T2", fecha:"", area:"LOG", guion:"",
       monitoreo:"Unidades cargadas x horas planificadas",
       transportesProgramados:74,
-      horas:[
-        {hora:"11:00 pm", armado:0, cargado:0},
-        {hora:"12:00 am", armado:0, cargado:0},
-        {hora:"1:00 am",  armado:0, cargado:0},
-        {hora:"2:00 am",  armado:0, cargado:0},
-        {hora:"3:00 am",  armado:0, cargado:0},
-        {hora:"4:00 am",  armado:0, cargado:0},
-        {hora:"5:00 am",  armado:0, cargado:0},
-        {hora:"6:00 am",  armado:0, cargado:0}
-      ],
+      horas: generarHorasPorTurno("Turno 3 - Nocturno"),
       planes:[
         {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
         {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
@@ -435,6 +458,10 @@
       cargarEstado();
       estado.turno = turno;
       estado.supervisor = supervisor;
+      if(!horasCoincidenConTurno(estado.horas, turno)){
+        estado.horas = generarHorasPorTurno(turno);
+        horaSelIdx = 0;
+      }
       guardarEstado();
       guardarSesion(SESSION_KEY, "1");
       mostrarApp();
@@ -462,6 +489,32 @@
   document.getElementById("btn-login").addEventListener("click", intentarLogin);
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
 
+  document.getElementById("btn-reset").addEventListener("click", function(){
+    var ok = confirm(
+      "Esto va a reiniciar TODO el reporte actual a cero:\n\n" +
+      "- Transportes programados\n" +
+      "- Armados y Cargados de todas las horas\n" +
+      "- La fecha (queda en la de hoy)\n\n" +
+      "El hist\u00f3rico ya guardado NO se borra.\n\n" +
+      "\u00bfSeguro que quieres continuar?"
+    );
+    if(!ok) return;
+
+    var turnoActual = estado.turno;
+    var supervisorActual = estado.supervisor;
+
+    estado = datosPorDefecto();
+    estado.turno = turnoActual;
+    estado.supervisor = supervisorActual;
+    estado.horas = generarHorasPorTurno(turnoActual);
+    estado.fecha = fechaHoyStr();
+    horaSelIdx = 0;
+
+    guardarEstado();
+    render();
+    toast("Reporte reiniciado. Listo para un nuevo d\u00eda.");
+  });
+
   /* ============== RENDER: CABECERA ============== */
   function bindCabecera(){
     document.getElementById("c-subarea").value = estado.subarea;
@@ -470,6 +523,7 @@
     document.getElementById("c-guion").value = estado.guion || "";
     document.getElementById("c-monitoreo").value = estado.monitoreo;
     document.getElementById("c-transportes").value = estado.transportesProgramados;
+    document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
     document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
     document.getElementById("c-fecha").oninput = function(){ estado.fecha = this.value; guardarEstado(); };
@@ -621,7 +675,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    var padL = 30, padR = 6, padT = 8, padB = 46;
+    var padL = 32, padR = 18, padT = 8, padB = 40;
     var chartW = Math.max(10, cssW - padL - padR);
     var chartH = Math.max(10, cssH - padT - padB);
     var n = horas.length;
@@ -682,19 +736,15 @@
       });
     }
 
-    // Etiquetas de hora en el eje X, en VERTICAL para que no se amontonen.
+    // Etiquetas de hora en el eje X, en HORIZONTAL, bien espaciadas.
     ctx.fillStyle = "#8d99a3";
-    ctx.font = "8.5px Inter, sans-serif";
+    ctx.font = "9px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
     horas.forEach(function(h,i){
       var x = xPos(i);
-      var y = padT + chartH + 6;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.PI/2);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(h.hora, 0, 0);
-      ctx.restore();
+      var y = padT + chartH + 10;
+      ctx.fillText(h.hora, x, y);
     });
 
     var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, cargado:0};
