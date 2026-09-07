@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>T2 SIC</title>
+<title>SIC DIGITAL</title>
 <meta name="theme-color" content="#0f1216">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -106,6 +106,18 @@
   }
   .campo-mini input:focus,.campo-mini textarea:focus{border-color:var(--amber);}
   .campo-mini.full{grid-column:1 / -1;}
+
+  /* Plan de Accion (alarma de cumplimiento) */
+  .campo-mini input.plan-accion-input{
+    cursor:pointer;color:var(--azul);font-weight:600;text-align:center;font-family:'Roboto Mono',monospace;font-size:12px;
+  }
+  .campo-mini input.plan-accion-input.alerta{
+    color:#fff;border-color:var(--rojo);font-weight:700;animation:pulso-alerta 1s infinite;
+  }
+  @keyframes pulso-alerta{
+    0%,100%{background:var(--panel-2);}
+    50%{background:rgba(229,72,77,0.55);}
+  }
 
   /* Transportes programados + estatus */
   .fila-transp{display:flex;gap:10px;margin-top:14px;}
@@ -220,7 +232,7 @@
   <div class="login-card">
     <div class="login-strip"></div>
     <div class="login-body">
-      <div class="login-brand"><span class="brand t2">T2</span><span class="brand sic">SIC</span></div>
+      <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
       <p class="login-sub">SIC Digital VPO &mdash; inicio de turno</p>
 
       <div class="campo">
@@ -247,7 +259,7 @@
 <!-- ================= APP ================= -->
 <div id="vista-app">
   <div class="topbar">
-    <div class="brand"><span class="t2" style="color:var(--amber)">T2</span> SIC</div>
+    <div class="brand"><span class="t2" style="color:var(--amber)">SIC</span> DIGITAL</div>
     <div class="topbar-actions">
       <button class="icon-btn" id="btn-reset" title="Reiniciar todo (nuevo reporte)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
@@ -266,7 +278,7 @@
         <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
         <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
         <div class="campo-mini"><label>Area</label><input id="c-area"></div>
-        <div class="campo-mini"><label>Gui&oacute;n</label><input id="c-guion" placeholder="Gui&oacute;n"></div>
+        <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-input" readonly value="-" title="Toca para silenciar la alarma"></div>
         <div class="campo-mini full"><label>Monitoreo</label><input id="c-monitoreo"></div>
       </div>
 
@@ -308,11 +320,11 @@
       <div class="horas-grid" id="horas-grid"></div>
 
       <div class="campo-dato">
-        <label>Armados</label>
+        <label>Armados (esta hora)</label>
         <input id="d-armado" inputmode="numeric" value="0">
       </div>
       <div class="campo-dato">
-        <label>Cargados</label>
+        <label>Cargados (esta hora)</label>
         <input id="d-cargado" inputmode="numeric" value="0">
       </div>
 
@@ -335,7 +347,7 @@
       </div>
     </section>
 
-    <footer class="app-footer">T2 SIC &middot; Creado por Borys Orellana</footer>
+    <footer class="app-footer">SIC DIGITAL &middot; Creado por Borys Orellana</footer>
   </main>
 </div>
 
@@ -368,6 +380,14 @@
     "Turno 3 - Nocturno": 23   // 11:00 pm a 7:00 am
   };
 
+  // Hora de corte (reloj real) para cada turno: si al llegar a esta hora
+  // no se ha alcanzado el 50% del total programado, se activa la alarma.
+  var TURNO_CORTE = {
+    "Turno 1 - Ma\u00f1ana": {h:11, m:0},   // 11:00 am
+    "Turno 2 - Tarde": {h:19, m:0},        // 7:00 pm
+    "Turno 3 - Nocturno": {h:2, m:59}      // 2:59 am
+  };
+
   function horaLabel(h24){
     var h = ((h24 % 24) + 24) % 24;
     var periodo = h < 12 ? "am" : "pm";
@@ -375,10 +395,14 @@
     return h12 + ":00 " + periodo;
   }
 
+  // Genera las horas de reporte del turno. La primera hora del turno es
+  // solo el ingreso (no se trabaja ni se reporta nada), por eso el
+  // reporte arranca 1 hora despues del inicio y termina en la hora de
+  // cierre del turno (8 horas de trabajo reportadas en total).
   function generarHorasPorTurno(turno){
     var inicio = (turno && TURNO_INICIO.hasOwnProperty(turno)) ? TURNO_INICIO[turno] : TURNO_INICIO["Turno 3 - Nocturno"];
     var horas = [];
-    for(var i=0; i<8; i++){
+    for(var i=1; i<=8; i++){
       horas.push({ hora: horaLabel(inicio + i), armado:0, cargado:0 });
     }
     return horas;
@@ -396,7 +420,7 @@
   function datosPorDefecto(){
     return {
       turno:"", supervisor:"",
-      subarea:"T2", fecha:"", area:"LOG", guion:"",
+      subarea:"T2", fecha:"", area:"LOG",
       monitoreo:"Unidades cargadas x horas planificadas",
       transportesProgramados:74,
       horas: generarHorasPorTurno("Turno 3 - Nocturno"),
@@ -475,9 +499,11 @@
     document.getElementById("vista-app").style.display = "block";
     if(!estado) cargarEstado();
     render();
+    iniciarMonitorAlarma();
   }
 
   function cerrarSesion(){
+    detenerMonitorAlarma();
     borrarSesion(SESSION_KEY);
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
@@ -511,6 +537,7 @@
     horaSelIdx = 0;
 
     guardarEstado();
+    silenciarAlarma(true);
     render();
     toast("Reporte reiniciado. Listo para un nuevo d\u00eda.");
   });
@@ -520,7 +547,6 @@
     document.getElementById("c-subarea").value = estado.subarea;
     document.getElementById("c-fecha").value = estado.fecha;
     document.getElementById("c-area").value = estado.area;
-    document.getElementById("c-guion").value = estado.guion || "";
     document.getElementById("c-monitoreo").value = estado.monitoreo;
     document.getElementById("c-transportes").value = estado.transportesProgramados;
     document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
@@ -528,7 +554,6 @@
     document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
     document.getElementById("c-fecha").oninput = function(){ estado.fecha = this.value; guardarEstado(); };
     document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarEstado(); };
-    document.getElementById("c-guion").oninput = function(){ estado.guion = this.value; guardarEstado(); };
     document.getElementById("c-monitoreo").oninput = function(){
       estado.monitoreo = this.value; guardarEstado();
       document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
@@ -538,22 +563,26 @@
       guardarEstado();
       dibujarGrafico();
       actualizarMensaje();
+      verificarAlarma();
     };
+
+    actualizarUIPlanAccion();
   }
 
   /* ============== ESTATUS DE CARGA (mensaje) ============== */
   function generarMensaje(){
+    calcularPorcentajes();
     var h = estado.horas[horaSelIdx] || {};
-    var pct = estado.transportesProgramados > 0 ? Math.round(((h.cargado||0)/estado.transportesProgramados)*100) : 0;
+    var pct = estado.transportesProgramados > 0 ? Math.round(((h.acumCargado||0)/estado.transportesProgramados)*100) : 0;
     return "STATUS DE CARGA\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
       "Supervisor: " + (estado.supervisor || "-") + "\n" +
       "Area: Logistica T2\n" +
-      "Guion: " + (estado.guion || "-") + "\n" +
+      "Plan de Accion: " + (alarmaActiva ? "ALERTA - No se alcanzo el 50%" : "OK") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
-      "Armados: " + (h.armado||0) + "\n" +
-      "Cargados: " + (h.cargado||0) + " / " + (estado.transportesProgramados||0) + "\n" +
+      "Armados (acum.): " + (h.acumArmado||0) + "\n" +
+      "Cargados (acum.): " + (h.acumCargado||0) + " / " + (estado.transportesProgramados||0) + "\n" +
       "Cumplimiento: " + pct + "%";
   }
 
@@ -648,10 +677,18 @@
   }
 
   /* ============== CALCULO + GRAFICO (canvas nativo, sin librerias externas) ============== */
+  // Ahora "armado"/"cargado" de cada hora son lo hecho EN ESA hora.
+  // Aqui se calcula el acumulado (suma) hora a hora para el grafico y
+  // el porcentaje de cumplimiento en vivo.
   function calcularPorcentajes(){
     var meta = estado.transportesProgramados || 0;
+    var sumaArmado = 0, sumaCargado = 0;
     estado.horas.forEach(function(h){
-      h.pct = meta > 0 ? (h.cargado||0) / meta : 0;
+      sumaArmado += (h.armado||0);
+      sumaCargado += (h.cargado||0);
+      h.acumArmado = sumaArmado;
+      h.acumCargado = sumaCargado;
+      h.pct = meta > 0 ? sumaCargado / meta : 0;
     });
     return meta;
   }
@@ -695,10 +732,10 @@
       ctx.fillText(Math.round(f*100) + "%", padL - 6, y);
     });
 
-    /* La zona roja/verde ahora es una ESCALERA calculada directamente del
-       dato real (pct) de cada hora: el limite entre rojo y verde para el
-       tramo [hora i, hora i+1) es el propio valor de esa hora. Como el
-       punto de esa hora vale exactamente eso, el punto siempre queda
+    /* La zona roja/verde es una ESCALERA calculada del acumulado real
+       (pct) de cada hora: el limite entre rojo y verde para el tramo
+       [hora i, hora i+1) es el propio valor acumulado de esa hora. Como
+       el punto de esa hora vale exactamente eso, el punto siempre queda
        justo en el borde o por encima -> nunca cae en zona roja. */
     var pctPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(h.pct||0)}; });
 
@@ -747,7 +784,7 @@
       ctx.fillText(h.hora, x, y);
     });
 
-    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, cargado:0};
+    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0};
     var pctUlt = Math.round((actual.pct||0)*100);
     var dot = document.getElementById("estado-dot");
     var txt = document.getElementById("estado-txt");
@@ -761,7 +798,7 @@
     pctEl.textContent = pctUlt + "%";
     pctEl.style.color = color;
 
-    document.getElementById("tag-total").textContent = (actual.cargado||0)+"/"+(estado.transportesProgramados||0);
+    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(estado.transportesProgramados||0);
   }
 
   var _resizeTimer = null;
@@ -779,14 +816,16 @@
     renderHorasGrid();
     guardarEnHistorico();
     actualizarMensaje();
+    verificarAlarma();
     toast("Hora " + estado.horas[horaSelIdx].hora + " actualizada");
   });
 
   /* ============== HISTORICO (tipo base de datos) ============== */
   function guardarEnHistorico(){
+    calcularPorcentajes();
     var lista = cargarHistorico();
     var h = estado.horas[horaSelIdx];
-    var pct = estado.transportesProgramados > 0 ? (h.cargado||0)/estado.transportesProgramados : 0;
+    var pct = estado.transportesProgramados > 0 ? (h.acumCargado||0)/estado.transportesProgramados : 0;
 
     var registro = {
       ts: Date.now(),
@@ -796,10 +835,11 @@
       supervisor: estado.supervisor,
       subarea: estado.subarea,
       area: estado.area,
-      guion: estado.guion,
       transportesProgramados: estado.transportesProgramados,
       armado: h.armado||0,
       cargado: h.cargado||0,
+      acumArmado: h.acumArmado||0,
+      acumCargado: h.acumCargado||0,
       pct: pct
     };
 
@@ -824,11 +864,12 @@
     lista.slice(0, 60).forEach(function(r){
       var pct = Math.round((r.pct||0)*100);
       var color = pct>=90 ? "var(--verde)" : (pct>=50 ? "var(--amber)" : "var(--rojo)");
+      var cargadoMostrar = (r.acumCargado!==undefined ? r.acumCargado : r.cargado)||0;
       var item = document.createElement("div");
       item.className = "hist-item";
       item.innerHTML =
         '<span class="hist-fecha">'+escapeAttr(r.fecha||"-")+'<br>'+escapeAttr(r.hora||"-")+'</span>'+
-        '<span class="hist-info">'+escapeAttr(r.turno||"")+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+(r.cargado||0)+'/'+(r.transportesProgramados||0)+'</span>'+
+        '<span class="hist-info">'+escapeAttr(r.turno||"")+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
         '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
       item.addEventListener("click", function(){
         if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" al editor?")){
@@ -846,6 +887,129 @@
       cont.appendChild(item);
     });
   }
+
+  /* ============== PLAN DE ACCION / ALARMA DE CUMPLIMIENTO ============== */
+  var alarmaActiva = false;
+  var alarmaSonidoId = null;
+  var monitorAlarmaId = null;
+
+  // Minutos transcurridos desde el inicio del turno hasta AHORA,
+  // manejando el cruce de medianoche (ej. turno nocturno).
+  function minutosDesdeInicioTurno(){
+    if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
+    var ahora = new Date();
+    var actualMin = ahora.getHours()*60 + ahora.getMinutes();
+    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var diff = actualMin - inicioMin;
+    if(diff < 0) diff += 24*60;
+    return diff;
+  }
+
+  // Minutos desde el inicio del turno hasta su hora de corte, manejando
+  // el cruce de medianoche.
+  function minutosDesdeInicioHastaCorte(){
+    if(!estado || !TURNO_CORTE[estado.turno] || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
+    var corte = TURNO_CORTE[estado.turno];
+    var corteMin = corte.h*60 + corte.m;
+    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var diff = corteMin - inicioMin;
+    if(diff < 0) diff += 24*60;
+    return diff;
+  }
+
+  function horaDeCortePasada(){
+    var transcurrido = minutosDesdeInicioTurno();
+    var hastaCorte = minutosDesdeInicioHastaCorte();
+    if(transcurrido === null || hastaCorte === null) return false;
+    // Margen de 1 hora despues del fin del turno (8h = 480min) para no
+    // arrastrar una alarma "vieja" de un turno anterior.
+    if(transcurrido > 480 + 60) return false;
+    return transcurrido >= hastaCorte;
+  }
+
+  function pctCumplimientoActual(){
+    calcularPorcentajes();
+    var horas = estado.horas;
+    if(!horas.length) return 0;
+    return horas[horas.length-1].pct || 0;
+  }
+
+  function reproducirBeep(){
+    try{
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return;
+      if(!reproducirBeep._ctx) reproducirBeep._ctx = new Ctx();
+      var ctx = reproducirBeep._ctx;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = 880;
+      gain.gain.value = 0.16;
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start();
+      setTimeout(function(){ try{ osc.stop(); }catch(e){} }, 240);
+    }catch(e){}
+  }
+
+  function actualizarUIPlanAccion(){
+    var caja = document.getElementById("c-plan-accion");
+    if(!caja) return;
+    if(alarmaActiva){
+      caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
+      caja.classList.add("alerta");
+    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
+      var corte = TURNO_CORTE[estado.turno];
+      var hh = String(corte.h).padStart(2,"0");
+      var mm = String(corte.m).padStart(2,"0");
+      caja.value = "OK \u00b7 corte " + hh + ":" + mm;
+      caja.classList.remove("alerta");
+    } else {
+      caja.value = "-";
+      caja.classList.remove("alerta");
+    }
+  }
+
+  function dispararAlarma(){
+    if(alarmaActiva) return;
+    alarmaActiva = true;
+    if(alarmaSonidoId) clearInterval(alarmaSonidoId);
+    reproducirBeep();
+    alarmaSonidoId = setInterval(reproducirBeep, 1500);
+    actualizarUIPlanAccion();
+    toast("\u26A0 No se alcanz\u00f3 el 50% a la hora de corte. Activa el Plan de Acci\u00f3n.");
+  }
+
+  function silenciarAlarma(sinAviso){
+    alarmaActiva = false;
+    if(alarmaSonidoId){ clearInterval(alarmaSonidoId); alarmaSonidoId = null; }
+    actualizarUIPlanAccion();
+    if(!sinAviso) toast("Alarma silenciada");
+  }
+
+  function verificarAlarma(){
+    if(!estado || !estado.turno) return;
+    if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){
+      dispararAlarma();
+    } else {
+      actualizarUIPlanAccion();
+    }
+  }
+
+  function iniciarMonitorAlarma(){
+    detenerMonitorAlarma();
+    verificarAlarma();
+    monitorAlarmaId = setInterval(verificarAlarma, 20000);
+  }
+
+  function detenerMonitorAlarma(){
+    if(monitorAlarmaId){ clearInterval(monitorAlarmaId); monitorAlarmaId = null; }
+    if(alarmaSonidoId){ clearInterval(alarmaSonidoId); alarmaSonidoId = null; }
+    alarmaActiva = false;
+  }
+
+  document.getElementById("c-plan-accion").addEventListener("click", function(){
+    if(alarmaActiva){ silenciarAlarma(false); }
+  });
 
   /* ============== COLAPSABLES ============== */
   document.querySelectorAll(".collapsible-head").forEach(function(head){
@@ -866,6 +1030,7 @@
     dibujarGrafico();
     renderHistorico();
     actualizarMensaje();
+    verificarAlarma();
   }
 
   /* ============== INICIO ============== */
