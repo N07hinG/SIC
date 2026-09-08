@@ -577,8 +577,7 @@
     return "STATUS DE CARGA\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
       "Supervisor: " + (estado.supervisor || "-") + "\n" +
-      "Area: Logistica T2\n" +
-      "Plan de Accion: " + (alarmaActiva ? "ALERTA - No se alcanzo el 50%" : "OK") + "\n" +
+      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
       "Armados (acum.): " + (h.acumArmado||0) + "\n" +
