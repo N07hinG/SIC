@@ -304,9 +304,9 @@
       <!-- Filtro de turno para el dashboard publico -->
       <div class="filtro-inicio" id="filtro-inicio">
         <div class="filtro-btn" data-filtro="todos">TODOS</div>
-        <div class="filtro-btn" data-filtro="Turno 1 - Ma&ntilde;ana">T1</div>
-        <div class="filtro-btn" data-filtro="Turno 2 - Tarde">T2</div>
-        <div class="filtro-btn" data-filtro="Turno 3 - Nocturno">T3</div>
+        <div class="filtro-btn" data-filtro="Turno 1 - Ma&ntilde;ana">Ma&ntilde;ana</div>
+        <div class="filtro-btn" data-filtro="Turno 2 - Tarde">Tarde</div>
+        <div class="filtro-btn" data-filtro="Turno 3 - Nocturno">Noche</div>
       </div>
       <div class="filtro-inicio-label" id="filtro-inicio-label">Mostrando: Total del d&iacute;a</div>
 
@@ -333,9 +333,9 @@
           <label for="in-turno-login">Selecciona tu Turno</label>
           <select id="in-turno-login">
             <option value="" selected disabled>Selecciona un turno</option>
-            <option value="Turno 1 - Ma&ntilde;ana">T1 &middot; Ma&ntilde;ana</option>
-            <option value="Turno 2 - Tarde">T2 &middot; Tarde</option>
-            <option value="Turno 3 - Nocturno">T3 &middot; Nocturno</option>
+            <option value="Turno 1 - Ma&ntilde;ana">Ma&ntilde;ana</option>
+            <option value="Turno 2 - Tarde">Tarde</option>
+            <option value="Turno 3 - Nocturno">Noche</option>
           </select>
         </div>
         <div class="campo">
@@ -647,6 +647,18 @@
     return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   }
 
+  // Nombre CORTO del turno que ve el usuario: solo "Ma\u00f1ana" / "Tarde" /
+  // "Noche" (sin la palabra "Turno", para no repetirla en textos que ya
+  // dicen "Turno: ..." o en la etiqueta "TURNO"). Esto es SOLO texto de
+  // presentacion: las claves internas usadas para guardar y filtrar
+  // datos ("Turno 1 - Ma\u00f1ana", etc.) no cambian en ningun lado.
+  function nombreCortoTurno(turno){
+    if(turno === "Turno 1 - Ma\u00f1ana") return "Ma\u00f1ana";
+    if(turno === "Turno 2 - Tarde") return "Tarde";
+    if(turno === "Turno 3 - Nocturno") return "Noche";
+    return turno || "-";
+  }
+
   /* ============== PANTALLA INICIAL: MENU DE USUARIO ============== */
   var CLAVE_ABINBEV = "@vpo2026";
   var rolSeleccionado = null; // "backus" (ABInBev) | "lavoro" (Externo)
@@ -755,7 +767,7 @@
   document.getElementById("btn-reset").addEventListener("click", function(){
     if(!estado || !estado.turno) return;
     var ok = confirm(
-      "Esto va a reiniciar el reporte del turno ACTUAL (" + estado.turno + ") a cero:\n\n" +
+      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(estado.turno) + ") a cero:\n\n" +
       "- Transportes programados de este turno\n" +
       "- Armados y Cargados de todas las horas de este turno\n\n" +
       "Los datos de los OTROS turnos y el hist\u00f3rico ya guardado NO se borran.\n\n" +
@@ -825,7 +837,7 @@
 
   /* ============== INFO SIMPLE (Lavoro) ============== */
   function bindInfoLavoro(){
-    document.getElementById("lv-turno").textContent = estado.turno || "-";
+    document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
     document.getElementById("lv-fecha").textContent = estado.fecha || "-";
   }
 
@@ -837,7 +849,7 @@
     var meta = reg ? reg.transportesProgramados : 0;
     var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
     return "STATUS DE CARGA\n" +
-      "Turno: " + (estado.turno || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
       "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
@@ -873,7 +885,7 @@
     var meta = reg ? (reg.transportesProgramados || 0) : 0;
     var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
     return "STATUS DE ARMADO\n" +
-      "Turno: " + (estado.turno || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
       "Encargado: " + (estado.nombreLavoro || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
@@ -959,15 +971,45 @@
     document.getElementById("d-cargado").value = h.cargado || 0;
   }
 
+  // Regla de negocio: primero se ARMA y despues se CARGA, por lo tanto el
+  // acumulado de CARGADOS nunca puede superar al acumulado de ARMADOS
+  // hasta esa misma hora. Devuelve cuantos "cargados" como maximo se
+  // pueden registrar en la hora "idx" sin romper esa regla.
+  function maxCargadoPermitidoEnHora(reg, idx){
+    var cumArmadoHastaHora = 0;
+    for(var i=0; i<=idx; i++){ cumArmadoHastaHora += (reg.horas[i].armado||0); }
+    var cumCargadoHorasAnteriores = 0;
+    for(var j=0; j<idx; j++){ cumCargadoHorasAnteriores += (reg.horas[j].cargado||0); }
+    var max = cumArmadoHastaHora - cumCargadoHorasAnteriores;
+    return max > 0 ? max : 0;
+  }
+
   document.getElementById("d-armado").addEventListener("input", function(){
     var reg = registroActual();
     if(!reg) return;
-    reg.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje(); actualizarMensajeArmado();
+    reg.horas[horaSelIdx].armado = Number(this.value)||0;
+    // Si al bajar el armado, el cargado ya registrado en esta hora queda
+    // por encima de lo permitido, se ajusta automaticamente hacia abajo.
+    var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
+    if((reg.horas[horaSelIdx].cargado||0) > maxPermitido){
+      reg.horas[horaSelIdx].cargado = maxPermitido;
+      document.getElementById("d-cargado").value = maxPermitido;
+      toast("Cargados ajustado: no puede superar lo armado (m\u00e1x. " + maxPermitido + ")");
+    }
+    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
   document.getElementById("d-cargado").addEventListener("input", function(){
     var reg = registroActual();
     if(!reg) return;
-    reg.horas[horaSelIdx].cargado = Number(this.value)||0; guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
+    var valor = Number(this.value)||0;
+    var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
+    if(valor > maxPermitido){
+      valor = maxPermitido;
+      this.value = valor;
+      toast("No puedes cargar m\u00e1s de lo armado. M\u00e1ximo permitido: " + maxPermitido);
+    }
+    reg.horas[horaSelIdx].cargado = valor;
+    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
 
   /* ============== PLANES (solo Backus) ============== */
@@ -1170,10 +1212,8 @@
   }
 
   function etiquetaCortaTurno(t){
-    if(t === "Turno 1 - Ma\u00f1ana") return "Turno 1 - Ma\u00f1ana";
-    if(t === "Turno 2 - Tarde") return "Turno 2 - Tarde";
-    if(t === "Turno 3 - Nocturno") return "Turno 3 - Nocturno";
-    return "Total del d\u00eda";
+    if(!t) return "Total del d\u00eda";
+    return nombreCortoTurno(t);
   }
 
   function actualizarDashboardInicio(){
@@ -1298,14 +1338,14 @@
       item.className = "hist-item";
       item.innerHTML =
         '<span class="hist-fecha">'+escapeAttr(r.fecha||"-")+'<br>'+escapeAttr(r.hora||"-")+'</span>'+
-        '<span class="hist-info">'+escapeAttr(r.turno||"")+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
+        '<span class="hist-info">'+escapeAttr(nombreCortoTurno(r.turno))+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
         '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
       item.addEventListener("click", function(){
         if(!r.turno || r.turno !== estado.turno){
-          toast("Ese registro es de otro turno (" + (r.turno||"-") + "). Ingresa a ese turno para editarlo.");
+          toast("Ese registro es de otro turno (" + nombreCortoTurno(r.turno) + "). Ingresa a ese turno para editarlo.");
           return;
         }
-        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" ("+r.turno+") al editor?")){
+        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" ("+nombreCortoTurno(r.turno)+") al editor?")){
           var reg = registroActual();
           var idx = reg.horas.findIndex(function(h){ return h.hora === r.hora; });
           if(idx >= 0){
