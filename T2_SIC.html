@@ -1051,24 +1051,26 @@
       ctx.fillText(Math.round(f*100) + "%", padL - 6, y);
     });
 
-    /* La zona roja/verde es una ESCALERA calculada del acumulado real
-       (pct) de cada hora: el limite entre rojo y verde para el tramo
-       [hora i, hora i+1) es el propio valor acumulado de esa hora. Como
-       el punto de esa hora vale exactamente eso, el punto siempre queda
-       justo en el borde o por encima -> nunca cae en zona roja. */
+    /* FONDO ESTATICO escalonado rojo/verde: es un tablero fijo, NUNCA
+       se recalcula con datos reales. Cada escalon representa el avance
+       ideal esperado a esa hora (i+1 de n horas del turno), dividiendo
+       el turno en partes iguales hasta el 100%. Este fondo no cambia
+       aunque cambien los datos: lo unico dinamico es la linea negra de
+       abajo, que sube y baja segun el % real acumulado de cada hora. */
     var pctPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(h.pct||0)}; });
 
     for(var s=0; s<n; s++){
       var xa = xPos(s);
       var xb = (s < n-1) ? xPos(s+1) : (padL + chartW);
-      var yLimite = yPos(horas[s].pct||0);
+      var metaEscalonFijo = (s+1) / n; // escalon fijo, no depende de datos reales
+      var yLimite = yPos(metaEscalonFijo);
       var yTop = yPos(1);
       var yBase = yPos(0);
-      // bloque rojo (0 .. pct de esta hora)
-      ctx.fillStyle = "rgba(229,72,77,0.85)";
+      // bloque rojo fijo (lo que falta hasta la meta de esa hora)
+      ctx.fillStyle = "#C00000";
       ctx.fillRect(xa, yLimite, xb-xa, yBase-yLimite);
-      // bloque verde (pct .. 100%)
-      ctx.fillStyle = "rgba(51,214,137,0.85)";
+      // bloque verde fijo (meta ya cubierta a esa hora)
+      ctx.fillStyle = "#00B050";
       ctx.fillRect(xa, yTop, xb-xa, yLimite-yTop);
     }
 
