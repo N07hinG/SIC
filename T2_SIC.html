@@ -48,6 +48,17 @@
   .login-brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px;}
   .login-brand .t2{font-size:36px;line-height:1;color:var(--amber);}
   .login-brand .sic{font-size:36px;line-height:1;color:var(--text);}
+  .login-topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .user-menu-wrap{position:relative;flex:none;margin-top:4px;}
+  .user-menu{
+    display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:160px;z-index:30;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:9px;overflow:hidden;
+    box-shadow:0 10px 28px rgba(0,0,0,.45);
+  }
+  .user-menu.open{display:block;}
+  .user-menu-item{padding:12px 14px;font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);}
+  .user-menu-item:last-child{border-bottom:none;}
+  .user-menu-item:active{background:var(--panel);}
   .login-sub{color:var(--text-soft);font-size:13px;margin:2px 0 20px;}
   .login-sep{height:1px;background:var(--border);margin:20px 0;}
   .login-seccion-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--text-soft);letter-spacing:.4px;margin:0 0 10px;text-transform:uppercase;}
@@ -102,15 +113,7 @@
     50%{background:rgba(229,72,77,0.55);}
   }
 
-  /* Botones de rol */
-  .rol-btn{
-    width:100%;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:transform .05s;
-  }
-  .rol-btn:active{transform:scale(0.98);}
-  .rol-btn.backus{background:var(--amber);color:#1a1300;}
-  .rol-btn.lavoro{background:var(--azul);color:#04182c;}
-  .subform{display:none;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:16px;margin:-2px 0 14px;}
+  .subform{display:none;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:16px;margin:14px 0 14px;}
   .subform.open{display:block;}
   .subform .campo{margin-bottom:12px;}
   .subform .campo:last-of-type{margin-bottom:14px;}
@@ -284,7 +287,18 @@
   <div class="login-card">
     <div class="login-strip"></div>
     <div class="login-body">
-      <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
+      <div class="login-topbar">
+        <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
+        <div class="user-menu-wrap">
+          <button class="icon-btn" id="btn-user-menu" type="button" title="Ingresar" aria-haspopup="true" aria-expanded="false">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </button>
+          <div class="user-menu" id="user-menu">
+            <div class="user-menu-item" id="opt-abinbev" data-rol="backus">ABInBev</div>
+            <div class="user-menu-item" id="opt-externo" data-rol="lavoro">Externo</div>
+          </div>
+        </div>
+      </div>
       <p class="login-sub">SIC Digital VPO &mdash; panel de turno</p>
 
       <!-- Filtro de turno para el dashboard publico -->
@@ -312,45 +326,28 @@
       </div>
       <div class="plan-accion-display" id="alerta-inicio" title="Toca para silenciar la alarma">-</div>
 
-      <div class="login-sep"></div>
-      <p class="login-seccion-titulo">Ingresar como</p>
-
-      <button class="rol-btn backus" id="btn-rol-backus" type="button">Usuario Backus</button>
-      <div class="subform" id="form-backus">
+      <!-- Formulario de ingreso unificado (se muestra tras elegir ABInBev o Externo) -->
+      <div class="subform" id="form-login">
+        <p class="login-seccion-titulo" id="form-login-titulo">Ingresar</p>
         <div class="campo">
-          <label for="in-turno-backus">Turno</label>
-          <select id="in-turno-backus">
+          <label for="in-turno-login">Selecciona tu Turno</label>
+          <select id="in-turno-login">
             <option value="" selected disabled>Selecciona un turno</option>
-            <option value="Turno 1 - Ma&ntilde;ana">Turno 1 - Ma&ntilde;ana</option>
-            <option value="Turno 2 - Tarde">Turno 2 - Tarde</option>
-            <option value="Turno 3 - Nocturno">Turno 3 - Nocturno</option>
+            <option value="Turno 1 - Ma&ntilde;ana">T1 &middot; Ma&ntilde;ana</option>
+            <option value="Turno 2 - Tarde">T2 &middot; Tarde</option>
+            <option value="Turno 3 - Nocturno">T3 &middot; Nocturno</option>
           </select>
         </div>
         <div class="campo">
-          <label for="in-nombre-backus">Escribe tu nombre</label>
-          <input id="in-nombre-backus" type="text" placeholder="Nombre y Apellido" autocomplete="off">
+          <label for="in-nombre-login">Ingresa tus Nombres Completos</label>
+          <input id="in-nombre-login" type="text" placeholder="Nombre y Apellido" autocomplete="off">
         </div>
-        <button class="subform-btn backus" id="btn-login-backus" type="button">Ingresar</button>
-        <div class="login-error" id="login-error-backus"></div>
-      </div>
-
-      <button class="rol-btn lavoro" id="btn-rol-lavoro" type="button">Usuario Lavoro</button>
-      <div class="subform" id="form-lavoro">
-        <div class="campo">
-          <label for="in-turno-lavoro">Turno</label>
-          <select id="in-turno-lavoro">
-            <option value="" selected disabled>Selecciona un turno</option>
-            <option value="Turno 1 - Ma&ntilde;ana">Turno 1 - Ma&ntilde;ana</option>
-            <option value="Turno 2 - Tarde">Turno 2 - Tarde</option>
-            <option value="Turno 3 - Nocturno">Turno 3 - Nocturno</option>
-          </select>
+        <div class="campo" id="campo-pass-login" style="display:none;">
+          <label for="in-pass-login">Contrase&ntilde;a</label>
+          <input id="in-pass-login" type="password" placeholder="Contrase&ntilde;a" autocomplete="off">
         </div>
-        <div class="campo">
-          <label for="in-nombre-lavoro">Escribe tu nombre</label>
-          <input id="in-nombre-lavoro" type="text" placeholder="Nombre y Apellido" autocomplete="off">
-        </div>
-        <button class="subform-btn lavoro" id="btn-login-lavoro" type="button">Ingresar</button>
-        <div class="login-error" id="login-error-lavoro"></div>
+        <button class="subform-btn backus" id="btn-login-confirmar" type="button">Ingresar</button>
+        <div class="login-error" id="login-error-generico"></div>
       </div>
     </div>
     <div class="login-footer">Creado por Borys Orellana</div>
@@ -650,53 +647,78 @@
     return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   }
 
-  /* ============== PANTALLA INICIAL: BOTONES DE ROL ============== */
-  document.getElementById("btn-rol-backus").addEventListener("click", function(){
-    document.getElementById("form-lavoro").classList.remove("open");
-    document.getElementById("form-backus").classList.toggle("open");
-  });
-  document.getElementById("btn-rol-lavoro").addEventListener("click", function(){
-    document.getElementById("form-backus").classList.remove("open");
-    document.getElementById("form-lavoro").classList.toggle("open");
+  /* ============== PANTALLA INICIAL: MENU DE USUARIO ============== */
+  var CLAVE_ABINBEV = "@vpo2026";
+  var rolSeleccionado = null; // "backus" (ABInBev) | "lavoro" (Externo)
+
+  var elUserMenu = document.getElementById("user-menu");
+  var elBtnUserMenu = document.getElementById("btn-user-menu");
+  var elFormLogin = document.getElementById("form-login");
+  var elCampoPass = document.getElementById("campo-pass-login");
+  var elFormLoginTitulo = document.getElementById("form-login-titulo");
+
+  function cerrarMenuUsuario(){
+    elUserMenu.classList.remove("open");
+    elBtnUserMenu.setAttribute("aria-expanded", "false");
+  }
+
+  elBtnUserMenu.addEventListener("click", function(e){
+    e.stopPropagation();
+    var abrir = !elUserMenu.classList.contains("open");
+    if(abrir){ elUserMenu.classList.add("open"); elBtnUserMenu.setAttribute("aria-expanded","true"); }
+    else { cerrarMenuUsuario(); }
   });
 
-  document.getElementById("btn-login-backus").addEventListener("click", function(){
-    var err = document.getElementById("login-error-backus");
+  document.addEventListener("click", function(e){
+    if(!elUserMenu.contains(e.target) && e.target !== elBtnUserMenu){
+      cerrarMenuUsuario();
+    }
+  });
+
+  function abrirFormularioLogin(rol){
+    rolSeleccionado = rol;
+    cerrarMenuUsuario();
+    document.getElementById("login-error-generico").textContent = "";
+    document.getElementById("in-turno-login").value = "";
+    document.getElementById("in-nombre-login").value = "";
+    document.getElementById("in-pass-login").value = "";
+    if(rol === "backus"){
+      elFormLoginTitulo.textContent = "Ingresar \u00b7 ABInBev";
+      elCampoPass.style.display = "block";
+    } else {
+      elFormLoginTitulo.textContent = "Ingresar \u00b7 Externo";
+      elCampoPass.style.display = "none";
+    }
+    elFormLogin.classList.add("open");
+  }
+
+  document.getElementById("opt-abinbev").addEventListener("click", function(){ abrirFormularioLogin("backus"); });
+  document.getElementById("opt-externo").addEventListener("click", function(){ abrirFormularioLogin("lavoro"); });
+
+  document.getElementById("btn-login-confirmar").addEventListener("click", function(){
+    var err = document.getElementById("login-error-generico");
     try{
-      var turno = document.getElementById("in-turno-backus").value;
-      var nombre = document.getElementById("in-nombre-backus").value.trim();
-      if(!turno){ err.textContent = "Selecciona un turno."; return; }
-      if(!nombre){ err.textContent = "Escribe tu nombre."; return; }
+      if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev o Externo primero."; return; }
+      var turno = document.getElementById("in-turno-login").value;
+      var nombre = document.getElementById("in-nombre-login").value.trim();
+      if(!turno){ err.textContent = "Selecciona tu turno."; return; }
+      if(!nombre){ err.textContent = "Ingresa tus nombres completos."; return; }
+      if(rolSeleccionado === "backus"){
+        var pass = document.getElementById("in-pass-login").value;
+        if(pass !== CLAVE_ABINBEV){ err.textContent = "Contrase\u00f1a incorrecta."; return; }
+      }
       err.textContent = "";
       if(!estado) cargarEstado();
       estado.turno = turno;
-      estado.nombreBackus = nombre;
+      if(rolSeleccionado === "backus"){ estado.nombreBackus = nombre; }
+      else { estado.nombreLavoro = nombre; }
       // Aseguramos que exista el registro de ESTE turno/fecha, sin tocar
       // ni sobreescribir los datos de ningun otro turno.
       obtenerRegistro(estado.fecha, turno, true);
       horaSelIdx = 0;
       guardarEstado();
-      guardarSesion(SESSION_KEY, "backus");
-      mostrarApp("backus");
-    }catch(e){
-      err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
-    }
-  });
-
-  document.getElementById("btn-login-lavoro").addEventListener("click", function(){
-    var err = document.getElementById("login-error-lavoro");
-    try{
-      if(!estado) cargarEstado();
-      var nombre = document.getElementById("in-nombre-lavoro").value.trim();
-      if(!estado.turno){ err.textContent = "A\u00fan no hay un turno configurado. Pide a un supervisor Backus que ingrese primero."; return; }
-      if(!nombre){ err.textContent = "Escribe tu nombre."; return; }
-      err.textContent = "";
-      estado.nombreLavoro = nombre;
-      obtenerRegistro(estado.fecha, estado.turno, true);
-      horaSelIdx = 0;
-      guardarEstado();
-      guardarSesion(SESSION_KEY, "lavoro");
-      mostrarApp("lavoro");
+      guardarSesion(SESSION_KEY, rolSeleccionado);
+      mostrarApp(rolSeleccionado);
     }catch(e){
       err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
     }
@@ -715,16 +737,16 @@
   function cerrarSesion(){
     borrarSesion(SESSION_KEY);
     rolActual = null;
+    rolSeleccionado = null;
     document.body.classList.remove("rol-backus", "rol-lavoro");
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
-    document.getElementById("in-turno-backus").value = "";
-    document.getElementById("in-nombre-backus").value = "";
-    document.getElementById("in-nombre-lavoro").value = "";
-    document.getElementById("login-error-backus").textContent = "";
-    document.getElementById("login-error-lavoro").textContent = "";
-    document.getElementById("form-backus").classList.remove("open");
-    document.getElementById("form-lavoro").classList.remove("open");
+    document.getElementById("in-turno-login").value = "";
+    document.getElementById("in-nombre-login").value = "";
+    document.getElementById("in-pass-login").value = "";
+    document.getElementById("login-error-generico").textContent = "";
+    elFormLogin.classList.remove("open");
+    cerrarMenuUsuario();
     actualizarDashboardInicio();
   }
 
