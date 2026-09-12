@@ -77,6 +77,16 @@
   .dash-caja.armado .pct{color:var(--azul);}
   .dash-caja.cargado .pct{color:var(--amber);}
 
+  /* Filtro de turno en la pantalla inicial */
+  .filtro-inicio{display:flex;gap:6px;margin-bottom:12px;}
+  .filtro-btn{
+    flex:1;text-align:center;padding:8px 4px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text-soft);font-size:10.5px;font-weight:700;cursor:pointer;
+    font-family:'Roboto Mono',monospace;letter-spacing:.2px;
+  }
+  .filtro-btn.activo{background:rgba(242,169,0,0.14);border-color:var(--amber);color:var(--amber);}
+  .filtro-inicio-label{text-align:center;font-size:10.5px;color:var(--text-soft);margin:-4px 0 10px;letter-spacing:.3px;}
+
   /* Plan de Accion (alarma de cumplimiento) - reutilizable en varias vistas */
   .plan-accion-display{
     cursor:pointer;color:var(--azul);font-weight:600;text-align:center;font-family:'Roboto Mono',monospace;font-size:12px;
@@ -277,6 +287,15 @@
       <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
       <p class="login-sub">SIC Digital VPO &mdash; panel de turno</p>
 
+      <!-- Filtro de turno para el dashboard publico -->
+      <div class="filtro-inicio" id="filtro-inicio">
+        <div class="filtro-btn" data-filtro="todos">TODOS</div>
+        <div class="filtro-btn" data-filtro="Turno 1 - Ma&ntilde;ana">T1</div>
+        <div class="filtro-btn" data-filtro="Turno 2 - Tarde">T2</div>
+        <div class="filtro-btn" data-filtro="Turno 3 - Nocturno">T3</div>
+      </div>
+      <div class="filtro-inicio-label" id="filtro-inicio-label">Mostrando: Total del d&iacute;a</div>
+
       <!-- Dashboard en vivo, visible sin necesidad de iniciar sesion -->
       <div class="dash-canvas-wrap"><canvas id="grafico-inicio"></canvas></div>
       <div class="dash-totales">
@@ -334,7 +353,7 @@
   <div class="topbar">
     <div class="brand"><span class="t2" style="color:var(--amber)">SIC</span> DIGITAL</div>
     <div class="topbar-actions">
-      <button class="icon-btn solo-backus" id="btn-reset" title="Reiniciar todo (nuevo reporte)">&#8635;</button>
+      <button class="icon-btn solo-backus" id="btn-reset" title="Reiniciar el turno actual (nuevo reporte)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
     </div>
   </div>
@@ -357,7 +376,7 @@
 
       <div class="fila-transp">
         <div class="caja-transp">
-          <label>TRANSPORTES PROGRAMADOS</label>
+          <label>TRANSPORTES PROGRAMADOS<span>(de este turno)</span></label>
           <input id="c-transportes" class="num" inputmode="numeric" value="74">
         </div>
         <div class="caja-estatus" id="btn-estatus">
@@ -457,6 +476,8 @@
   var DATA_KEY = "t2sic_data";
   var HIST_KEY = "t2sic_historico";
 
+  var TURNOS_VALIDOS = ["Turno 1 - Ma\u00f1ana","Turno 2 - Tarde","Turno 3 - Nocturno"];
+
   /* ============== ALMACENAMIENTO SEGURO ============== */
   var memoria = {}, memoriaSesion = {};
   function guardarValor(key, val){ try{ localStorage.setItem(key, val); }catch(e){ memoria[key] = val; } }
@@ -469,6 +490,7 @@
   var estado = null;
   var horaSelIdx = 0;
   var rolActual = null; // "backus" | "lavoro"
+  var filtroInicioActual = "todos"; // "todos" | uno de TURNOS_VALIDOS
 
   var TURNO_INICIO = {
     "Turno 1 - Ma\u00f1ana": 7,   // 7:00 am a 3:00 pm
@@ -504,13 +526,53 @@
     return horas;
   }
 
-  function horasCoincidenConTurno(horas, turno){
-    var esperadas = generarHorasPorTurno(turno);
-    if(!horas || horas.length !== esperadas.length) return false;
-    for(var i=0; i<esperadas.length; i++){
-      if(horas[i].hora !== esperadas[i].hora) return false;
+  /* ============== REGISTROS SEPARADOS POR FECHA + TURNO ==============
+     Cada turno (y cada fecha) tiene su PROPIO registro independiente:
+     { horas: [...], transportesProgramados: N }
+     Nunca se comparten ni se copian datos entre turnos. */
+  function claveFecha(f){
+    var s = String(f||"").trim();
+    return s || "SIN_FECHA";
+  }
+
+  // Crea (si crear=true) o consulta (si crear=false) el registro de un
+  // turno especifico en una fecha especifica. Si no existe y crear es
+  // false, devuelve un registro transitorio vacio (no se guarda nada,
+  // solo sirve para lectura/visualizacion).
+  function obtenerRegistro(fecha, turno, crear){
+    if(!estado.datosPorTurno) estado.datosPorTurno = {};
+    var fk = claveFecha(fecha);
+    if(crear){
+      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
+      if(!estado.datosPorTurno[fk][turno]){
+        estado.datosPorTurno[fk][turno] = {
+          horas: generarHorasPorTurno(turno),
+          transportesProgramados: 74
+        };
+      }
+      return estado.datosPorTurno[fk][turno];
     }
-    return true;
+    if(estado.datosPorTurno[fk] && estado.datosPorTurno[fk][turno]){
+      return estado.datosPorTurno[fk][turno];
+    }
+    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0 };
+  }
+
+  // Registro del turno actualmente activo en la sesion (el que se esta
+  // editando ahora mismo). Se crea automaticamente si no existe todavia.
+  function registroActual(){
+    if(!estado.turno) return null;
+    return obtenerRegistro(estado.fecha, estado.turno, true);
+  }
+
+  function calcularAcumuladoRegistro(reg){
+    var meta = (reg && reg.transportesProgramados) || 0;
+    var sumaArmado = 0, sumaCargado = 0;
+    ((reg && reg.horas) || []).forEach(function(h){
+      sumaArmado += (h.armado||0);
+      sumaCargado += (h.cargado||0);
+    });
+    return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
   }
 
   function datosPorDefecto(){
@@ -518,8 +580,7 @@
       turno:"", nombreBackus:"", nombreLavoro:"",
       subarea:"T2", fecha:"", area:"LOG",
       monitoreo:"Unidades cargadas x horas planificadas",
-      transportesProgramados:74,
-      horas: generarHorasPorTurno("Turno 3 - Nocturno"),
+      datosPorTurno:{},
       planes:[
         {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
         {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
@@ -547,7 +608,21 @@
       else { estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
     }catch(e){ estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
     if(!estado.fecha) estado.fecha = fechaHoyStr();
-    if(!estado.horas || !estado.horas.length) estado.horas = datosPorDefecto().horas;
+    if(!estado.datosPorTurno) estado.datosPorTurno = {};
+    // Migracion de formato antiguo (una sola tabla de horas compartida
+    // para todos los turnos) hacia el nuevo formato separado por turno.
+    if(estado.horas && estado.horas.length && estado.turno){
+      var fk = claveFecha(estado.fecha);
+      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
+      if(!estado.datosPorTurno[fk][estado.turno]){
+        estado.datosPorTurno[fk][estado.turno] = {
+          horas: estado.horas,
+          transportesProgramados: estado.transportesProgramados || 74
+        };
+      }
+    }
+    delete estado.horas;
+    delete estado.transportesProgramados;
   }
 
   function guardarEstado(){ try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){} }
@@ -587,10 +662,10 @@
       if(!estado) cargarEstado();
       estado.turno = turno;
       estado.nombreBackus = nombre;
-      if(!horasCoincidenConTurno(estado.horas, turno)){
-        estado.horas = generarHorasPorTurno(turno);
-        horaSelIdx = 0;
-      }
+      // Aseguramos que exista el registro de ESTE turno/fecha, sin tocar
+      // ni sobreescribir los datos de ningun otro turno.
+      obtenerRegistro(estado.fecha, turno, true);
+      horaSelIdx = 0;
       guardarEstado();
       guardarSesion(SESSION_KEY, "backus");
       mostrarApp("backus");
@@ -608,6 +683,8 @@
       if(!nombre){ err.textContent = "Escribe tu nombre."; return; }
       err.textContent = "";
       estado.nombreLavoro = nombre;
+      obtenerRegistro(estado.fecha, estado.turno, true);
+      horaSelIdx = 0;
       guardarEstado();
       guardarSesion(SESSION_KEY, "lavoro");
       mostrarApp("lavoro");
@@ -645,52 +722,66 @@
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
 
   document.getElementById("btn-reset").addEventListener("click", function(){
+    if(!estado || !estado.turno) return;
     var ok = confirm(
-      "Esto va a reiniciar TODO el reporte actual a cero:\n\n" +
-      "- Transportes programados\n" +
-      "- Armados y Cargados de todas las horas\n" +
-      "- La fecha (queda en la de hoy)\n\n" +
-      "El hist\u00f3rico ya guardado NO se borra.\n\n" +
+      "Esto va a reiniciar el reporte del turno ACTUAL (" + estado.turno + ") a cero:\n\n" +
+      "- Transportes programados de este turno\n" +
+      "- Armados y Cargados de todas las horas de este turno\n\n" +
+      "Los datos de los OTROS turnos y el hist\u00f3rico ya guardado NO se borran.\n\n" +
       "\u00bfSeguro que quieres continuar?"
     );
     if(!ok) return;
 
-    var turnoActual = estado.turno;
-    var nombreBackusActual = estado.nombreBackus;
-    var nombreLavoroActual = estado.nombreLavoro;
-
-    estado = datosPorDefecto();
-    estado.turno = turnoActual;
-    estado.nombreBackus = nombreBackusActual;
-    estado.nombreLavoro = nombreLavoroActual;
-    estado.horas = generarHorasPorTurno(turnoActual);
-    estado.fecha = fechaHoyStr();
+    var fk = claveFecha(estado.fecha);
+    if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
+    estado.datosPorTurno[fk][estado.turno] = {
+      horas: generarHorasPorTurno(estado.turno),
+      transportesProgramados: 74
+    };
     horaSelIdx = 0;
 
     guardarEstado();
     silenciarAlarma(true);
     render();
-    toast("Reporte reiniciado. Listo para un nuevo d\u00eda.");
+    toast("Reporte del turno reiniciado. Los dem\u00e1s turnos no se modificaron.");
   });
 
   /* ============== RENDER: CABECERA (Backus) ============== */
   function bindCabecera(){
+    var reg = registroActual();
     document.getElementById("c-subarea").value = estado.subarea;
     document.getElementById("c-fecha").value = estado.fecha;
     document.getElementById("c-area").value = estado.area;
     document.getElementById("c-monitoreo").value = estado.monitoreo;
-    document.getElementById("c-transportes").value = estado.transportesProgramados;
+    document.getElementById("c-transportes").value = reg ? reg.transportesProgramados : 0;
     document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
     document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
-    document.getElementById("c-fecha").oninput = function(){ estado.fecha = this.value; guardarEstado(); bindInfoLavoro(); };
+    document.getElementById("c-fecha").oninput = function(){
+      estado.fecha = this.value; guardarEstado();
+      // Cambiar de fecha mueve el contexto a otro registro (fecha+turno);
+      // nunca mezcla datos entre fechas ni entre turnos.
+      obtenerRegistro(estado.fecha, estado.turno, true);
+      horaSelIdx = 0;
+      bindInfoLavoro();
+      renderHorasGrid();
+      bindDatosHora();
+      dibujarGrafico();
+      renderHistorico();
+      actualizarMensaje();
+      actualizarMensajeArmado();
+      verificarAlarma();
+      document.getElementById("c-transportes").value = registroActual().transportesProgramados;
+    };
     document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarEstado(); };
     document.getElementById("c-monitoreo").oninput = function(){
       estado.monitoreo = this.value; guardarEstado();
       document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
     };
     document.getElementById("c-transportes").oninput = function(){
-      estado.transportesProgramados = Number(this.value)||0;
+      var r = registroActual();
+      if(!r) return;
+      r.transportesProgramados = Number(this.value)||0;
       guardarEstado();
       dibujarGrafico();
       actualizarMensaje();
@@ -710,8 +801,10 @@
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   function generarMensaje(){
     calcularPorcentajes();
-    var h = estado.horas[horaSelIdx] || {};
-    var pct = estado.transportesProgramados > 0 ? Math.round(((h.acumCargado||0)/estado.transportesProgramados)*100) : 0;
+    var reg = registroActual();
+    var h = (reg && reg.horas[horaSelIdx]) || {};
+    var meta = reg ? reg.transportesProgramados : 0;
+    var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
     return "STATUS DE CARGA\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
       "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
@@ -719,7 +812,7 @@
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
       "Armados (acum.): " + (h.acumArmado||0) + "\n" +
-      "Cargados (acum.): " + (h.acumCargado||0) + " / " + (estado.transportesProgramados||0) + "\n" +
+      "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
       "Cumplimiento: " + pct + "%";
   }
 
@@ -744,8 +837,9 @@
   /* ============== ESTATUS DE ARMADO (mensaje Lavoro) ============== */
   function generarMensajeArmado(){
     calcularPorcentajes();
-    var h = estado.horas[horaSelIdx] || {};
-    var meta = estado.transportesProgramados || 0;
+    var reg = registroActual();
+    var h = (reg && reg.horas[horaSelIdx]) || {};
+    var meta = reg ? (reg.transportesProgramados || 0) : 0;
     var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
     return "STATUS DE ARMADO\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
@@ -807,7 +901,9 @@
   function renderHorasGrid(){
     var cont = document.getElementById("horas-grid");
     cont.innerHTML = "";
-    estado.horas.forEach(function(h, i){
+    var reg = registroActual();
+    if(!reg) return;
+    reg.horas.forEach(function(h, i){
       var tieneDatos = (h.armado||h.cargado) ? true : false;
       var btn = document.createElement("div");
       btn.className = "hora-btn" + (i === horaSelIdx ? " activa" : "");
@@ -825,16 +921,22 @@
   }
 
   function bindDatosHora(){
-    var h = estado.horas[horaSelIdx];
+    var reg = registroActual();
+    if(!reg) return;
+    var h = reg.horas[horaSelIdx];
     document.getElementById("d-armado").value = h.armado || 0;
     document.getElementById("d-cargado").value = h.cargado || 0;
   }
 
   document.getElementById("d-armado").addEventListener("input", function(){
-    estado.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje(); actualizarMensajeArmado();
+    var reg = registroActual();
+    if(!reg) return;
+    reg.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje(); actualizarMensajeArmado();
   });
   document.getElementById("d-cargado").addEventListener("input", function(){
-    estado.horas[horaSelIdx].cargado = Number(this.value)||0; guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
+    var reg = registroActual();
+    if(!reg) return;
+    reg.horas[horaSelIdx].cargado = Number(this.value)||0; guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
 
   /* ============== PLANES (solo Backus) ============== */
@@ -856,13 +958,16 @@
   }
 
   /* ============== CALCULO (compartido) ============== */
-  // "armado"/"cargado" de cada hora son lo hecho EN ESA hora.
-  // Aqui se calcula el acumulado (suma) hora a hora para los graficos y
-  // los porcentajes de avance/cumplimiento en vivo.
+  // "armado"/"cargado" de cada hora son lo hecho EN ESA hora, dentro del
+  // registro del turno actualmente activo. Aqui se calcula el acumulado
+  // (suma) hora a hora para los graficos y porcentajes de ese turno,
+  // sin tocar los datos de ningun otro turno.
   function calcularPorcentajes(){
-    var meta = estado.transportesProgramados || 0;
+    var reg = registroActual();
+    if(!reg) return 0;
+    var meta = reg.transportesProgramados || 0;
     var sumaArmado = 0, sumaCargado = 0;
-    estado.horas.forEach(function(h){
+    reg.horas.forEach(function(h){
       sumaArmado += (h.armado||0);
       sumaCargado += (h.cargado||0);
       h.acumArmado = sumaArmado;
@@ -875,8 +980,10 @@
 
   /* ============== GRAFICO PRINCIPAL (solo Backus, canvas nativo) ============== */
   function dibujarGrafico(){
+    var reg = registroActual();
+    if(!reg) return;
     var meta = calcularPorcentajes();
-    var horas = estado.horas;
+    var horas = reg.horas;
     var canvas = document.getElementById("grafico");
     var wrap = canvas.parentElement;
     if(!wrap || !horas.length) return;
@@ -979,10 +1086,13 @@
     pctEl.textContent = pctUlt + "%";
     pctEl.style.color = color;
 
-    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(estado.transportesProgramados||0);
+    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(reg.transportesProgramados||0);
   }
 
-  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ============== */
+  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ==============
+     Se filtra por turno usando "filtroInicioActual". Si es "todos", se
+     suman los 3 turnos de la fecha actual (Total del Dia). Nunca mezcla
+     ni copia datos entre turnos: cada uno se lee de su propio registro. */
   function dibujarGraficoInicio(pctArmado, pctCargado){
     var canvas = document.getElementById("grafico-inicio");
     if(!canvas) return;
@@ -1026,14 +1136,32 @@
     barra(startX + barW + gap, pctCargado, "#f2a900", "CARGADO");
   }
 
+  function etiquetaCortaTurno(t){
+    if(t === "Turno 1 - Ma\u00f1ana") return "Turno 1 - Ma\u00f1ana";
+    if(t === "Turno 2 - Tarde") return "Turno 2 - Tarde";
+    if(t === "Turno 3 - Nocturno") return "Turno 3 - Nocturno";
+    return "Total del d\u00eda";
+  }
+
   function actualizarDashboardInicio(){
     if(!estado) cargarEstado();
     if(!estado){ return; }
-    calcularPorcentajes();
-    var meta = estado.transportesProgramados || 0;
-    var ultima = estado.horas[estado.horas.length-1] || {acumArmado:0, acumCargado:0};
-    var totalArmado = ultima.acumArmado || 0;
-    var totalCargado = ultima.acumCargado || 0;
+
+    var fechaRef = estado.fecha || fechaHoyStr();
+    var totalArmado = 0, totalCargado = 0, meta = 0;
+
+    if(filtroInicioActual !== "todos"){
+      var reg = obtenerRegistro(fechaRef, filtroInicioActual, false);
+      var c = calcularAcumuladoRegistro(reg);
+      totalArmado = c.armado; totalCargado = c.cargado; meta = c.meta;
+    } else {
+      TURNOS_VALIDOS.forEach(function(t){
+        var r = obtenerRegistro(fechaRef, t, false);
+        var c2 = calcularAcumuladoRegistro(r);
+        totalArmado += c2.armado; totalCargado += c2.cargado; meta += c2.meta;
+      });
+    }
+
     var pctArmado = meta > 0 ? Math.round((totalArmado/meta)*100) : 0;
     var pctCargado = meta > 0 ? Math.round((totalCargado/meta)*100) : 0;
 
@@ -1041,10 +1169,21 @@
     document.getElementById("ini-pct-armado").textContent = pctArmado + "%";
     document.getElementById("ini-total-cargado").textContent = totalCargado + " / " + meta;
     document.getElementById("ini-pct-cargado").textContent = pctCargado + "%";
+    document.getElementById("filtro-inicio-label").textContent = "Mostrando: " + etiquetaCortaTurno(filtroInicioActual === "todos" ? null : filtroInicioActual);
 
     dibujarGraficoInicio(pctArmado, pctCargado);
     verificarAlarma();
   }
+
+  document.getElementById("filtro-inicio").querySelectorAll(".filtro-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      filtroInicioActual = btn.getAttribute("data-filtro");
+      document.getElementById("filtro-inicio").querySelectorAll(".filtro-btn").forEach(function(b){
+        b.classList.toggle("activo", b === btn);
+      });
+      actualizarDashboardInicio();
+    });
+  });
 
   var _resizeTimer = null;
   window.addEventListener("resize", function(){
@@ -1057,6 +1196,8 @@
 
   /* ============== ACTUALIZAR ============== */
   document.getElementById("btn-actualizar").addEventListener("click", function(){
+    var reg = registroActual();
+    if(!reg) return;
     guardarEstado();
     dibujarGrafico();
     renderHorasGrid();
@@ -1065,15 +1206,17 @@
     actualizarMensajeArmado();
     actualizarDashboardInicio();
     verificarAlarma();
-    toast("Hora " + estado.horas[horaSelIdx].hora + " actualizada");
+    toast("Hora " + reg.horas[horaSelIdx].hora + " actualizada");
   });
 
   /* ============== HISTORICO (solo Backus) ============== */
   function guardarEnHistorico(){
     calcularPorcentajes();
+    var reg = registroActual();
+    if(!reg) return;
     var lista = cargarHistorico();
-    var h = estado.horas[horaSelIdx];
-    var pct = estado.transportesProgramados > 0 ? (h.acumCargado||0)/estado.transportesProgramados : 0;
+    var h = reg.horas[horaSelIdx];
+    var pct = reg.transportesProgramados > 0 ? (h.acumCargado||0)/reg.transportesProgramados : 0;
 
     var registro = {
       ts: Date.now(),
@@ -1084,7 +1227,7 @@
       encargadoArmado: estado.nombreLavoro,
       subarea: estado.subarea,
       area: estado.area,
-      transportesProgramados: estado.transportesProgramados,
+      transportesProgramados: reg.transportesProgramados,
       armado: h.armado||0,
       cargado: h.cargado||0,
       acumArmado: h.acumArmado||0,
@@ -1092,8 +1235,12 @@
       pct: pct
     };
 
+    // Clave unica de registro historico: fecha + turno + hora, para que
+    // dos turnos distintos con la misma hora del dia NUNCA se pisen.
     var idx = lista.findIndex(function(r){
-      return String(r.fecha).trim() === String(estado.fecha).trim() && String(r.hora).trim() === String(h.hora).trim();
+      return String(r.fecha).trim() === String(estado.fecha).trim() &&
+             String(r.turno||"").trim() === String(estado.turno||"").trim() &&
+             String(r.hora).trim() === String(h.hora).trim();
     });
     if(idx >= 0) lista[idx] = registro; else lista.push(registro);
 
@@ -1121,11 +1268,16 @@
         '<span class="hist-info">'+escapeAttr(r.turno||"")+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
         '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
       item.addEventListener("click", function(){
-        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" al editor?")){
-          var idx = estado.horas.findIndex(function(h){ return h.hora === r.hora; });
+        if(!r.turno || r.turno !== estado.turno){
+          toast("Ese registro es de otro turno (" + (r.turno||"-") + "). Ingresa a ese turno para editarlo.");
+          return;
+        }
+        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" ("+r.turno+") al editor?")){
+          var reg = registroActual();
+          var idx = reg.horas.findIndex(function(h){ return h.hora === r.hora; });
           if(idx >= 0){
-            estado.horas[idx].armado = r.armado;
-            estado.horas[idx].cargado = r.cargado;
+            reg.horas[idx].armado = r.armado;
+            reg.horas[idx].cargado = r.cargado;
             horaSelIdx = idx;
             guardarEstado();
             render();
@@ -1140,7 +1292,8 @@
   /* ============== PLAN DE ACCION / ALARMA DE CUMPLIMIENTO ============== */
   /* Corre siempre (desde el arranque de la app), independiente de si hay
      alguien con sesion iniciada, para que la alerta se vea/suene tambien
-     en la pantalla inicial. La logica de corte horario no cambia. */
+     en la pantalla inicial. La logica de corte horario no cambia, y
+     siempre evalua el turno actualmente activo en la sesion. */
   var alarmaActiva = false;
   var alarmaSonidoId = null;
   var monitorAlarmaId = null;
@@ -1180,11 +1333,11 @@
   }
 
   function pctCumplimientoActual(){
-    if(!estado) return 0;
+    if(!estado || !estado.turno) return 0;
     calcularPorcentajes();
-    var horas = estado.horas;
-    if(!horas.length) return 0;
-    return horas[horas.length-1].pct || 0;
+    var reg = registroActual();
+    if(!reg || !reg.horas.length) return 0;
+    return reg.horas[reg.horas.length-1].pct || 0;
   }
 
   function reproducirBeep(){
