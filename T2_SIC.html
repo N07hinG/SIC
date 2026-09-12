@@ -227,6 +227,7 @@
     padding:12px 14px;font-size:16px;outline:none;font-family:'Roboto Mono',monospace;font-weight:600;
   }
   .campo-dato input:focus{border-color:var(--amber);}
+  .campo-dato input:disabled{opacity:.4;cursor:not-allowed;color:var(--text-soft);}
 
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;border:1px solid var(--border);
@@ -968,7 +969,21 @@
     if(!reg) return;
     var h = reg.horas[horaSelIdx];
     document.getElementById("d-armado").value = h.armado || 0;
-    document.getElementById("d-cargado").value = h.cargado || 0;
+    var elCargado = document.getElementById("d-cargado");
+    elCargado.value = h.cargado || 0;
+    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
+      elCargado.disabled = true;
+      elCargado.title = "No se permite registrar Cargados a la 1:00 am (Turno Noche).";
+    } else {
+      elCargado.disabled = false;
+      elCargado.removeAttribute("title");
+    }
+  }
+
+  // Regla especial: para el usuario ABInBev, en el Turno Noche, la hora
+  // 1:00 am no admite edicion de "Cargados" (solo esa hora puntual).
+  function cargadoBloqueadoEnHora(turno, horaTxt){
+    return turno === "Turno 3 - Nocturno" && horaTxt === "1:00 am";
   }
 
   // Regla de negocio: primero se ARMA y despues se CARGA, por lo tanto el
@@ -1001,6 +1016,13 @@
   document.getElementById("d-cargado").addEventListener("input", function(){
     var reg = registroActual();
     if(!reg) return;
+    var h = reg.horas[horaSelIdx];
+    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
+      // Bloqueo duro por si el input llega a habilitarse por otra via.
+      this.value = h.cargado || 0;
+      toast("No se permite registrar Cargados a la 1:00 am (Turno Noche).");
+      return;
+    }
     var valor = Number(this.value)||0;
     var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
     if(valor > maxPermitido){
@@ -1430,26 +1452,60 @@
     }catch(e){}
   }
 
+  // Caja DENTRO de la app (ABInBev / c-plan-accion): siempre refleja el
+  // turno REAL de la sesion activa (estado.turno) y la alarma real.
+  function actualizarPlanAccionApp(){
+    var caja = document.getElementById("c-plan-accion");
+    if(!caja) return;
+    if(alarmaActiva){
+      caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
+      caja.classList.add("alerta");
+    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
+      var corte = TURNO_CORTE[estado.turno];
+      var hh = String(corte.h).padStart(2,"0");
+      var mm = String(corte.m).padStart(2,"0");
+      caja.value = "OK \u00b7 corte " + hh + ":" + mm;
+      caja.classList.remove("alerta");
+    } else {
+      caja.value = "-";
+      caja.classList.remove("alerta");
+    }
+  }
+
+  // Caja de la PANTALLA PRINCIPAL (#alerta-inicio): sigue el filtro que
+  // el usuario elige ah\u00ed mismo (Ma\u00f1ana/Tarde/Noche/TODOS), NO el
+  // turno de la sesion activa. Por eso, al hacer click en un filtro,
+  // ahora si se actualiza con la hora de corte REAL de ese turno.
+  function actualizarAlertaInicio(){
+    var caja = document.getElementById("alerta-inicio");
+    if(!caja) return;
+    var turnoVisto = (filtroInicioActual !== "todos") ? filtroInicioActual : null;
+    if(!turnoVisto){
+      // "TODOS" combina 3 turnos, cada uno con su propia hora de corte,
+      // asi que no hay una sola hora de corte que mostrar aqui.
+      caja.textContent = "-";
+      caja.classList.remove("alerta");
+      return;
+    }
+    var esElTurnoConAlarma = alarmaActiva && estado && estado.turno === turnoVisto;
+    if(esElTurnoConAlarma){
+      caja.textContent = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
+      caja.classList.add("alerta");
+    } else if(TURNO_CORTE[turnoVisto]){
+      var corte = TURNO_CORTE[turnoVisto];
+      var hh = String(corte.h).padStart(2,"0");
+      var mm = String(corte.m).padStart(2,"0");
+      caja.textContent = "OK \u00b7 corte " + hh + ":" + mm;
+      caja.classList.remove("alerta");
+    } else {
+      caja.textContent = "-";
+      caja.classList.remove("alerta");
+    }
+  }
+
   function actualizarUIPlanAccion(){
-    var cajas = document.querySelectorAll(".plan-accion-display");
-    cajas.forEach(function(caja){
-      var esInput = caja.tagName === "INPUT";
-      if(alarmaActiva){
-        var txtAlerta = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
-        if(esInput) caja.value = txtAlerta; else caja.textContent = txtAlerta;
-        caja.classList.add("alerta");
-      } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
-        var corte = TURNO_CORTE[estado.turno];
-        var hh = String(corte.h).padStart(2,"0");
-        var mm = String(corte.m).padStart(2,"0");
-        var txtOk = "OK \u00b7 corte " + hh + ":" + mm;
-        if(esInput) caja.value = txtOk; else caja.textContent = txtOk;
-        caja.classList.remove("alerta");
-      } else {
-        if(esInput) caja.value = "-"; else caja.textContent = "-";
-        caja.classList.remove("alerta");
-      }
-    });
+    actualizarPlanAccionApp();
+    actualizarAlertaInicio();
   }
 
   function dispararAlarma(){
@@ -1486,7 +1542,7 @@
 
   document.querySelectorAll(".plan-accion-display").forEach(function(el){
     el.addEventListener("click", function(){
-      if(alarmaActiva){ silenciarAlarma(false); }
+      if(this.classList.contains("alerta")){ silenciarAlarma(false); }
     });
   });
 
