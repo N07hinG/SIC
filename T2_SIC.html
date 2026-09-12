@@ -35,20 +35,23 @@
   .brand{font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:0.5px;}
   .num{font-family:'Roboto Mono',monospace;}
 
-  /* ---------- LOGIN ---------- */
+  /* ---------- PANTALLA INICIAL / LOGIN ---------- */
   #vista-login{
     min-height:100vh;min-height:100dvh;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:28px 20px;
+    display:flex;flex-direction:column;align-items:center;
+    padding:26px 16px 40px;
     background:radial-gradient(ellipse at 50% -10%, rgba(242,169,0,0.10), transparent 55%), var(--bg);
   }
-  .login-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .login-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
   .login-strip{height:5px;background:linear-gradient(90deg,var(--rojo) 0 33%, var(--amber) 33% 66%, var(--verde) 66% 100%);}
-  .login-body{padding:30px 26px 24px;}
+  .login-body{padding:26px 24px 22px;}
   .login-brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px;}
-  .login-brand .t2{font-size:40px;line-height:1;color:var(--amber);}
-  .login-brand .sic{font-size:40px;line-height:1;color:var(--text);}
-  .login-sub{color:var(--text-soft);font-size:13px;margin:2px 0 26px;}
+  .login-brand .t2{font-size:36px;line-height:1;color:var(--amber);}
+  .login-brand .sic{font-size:36px;line-height:1;color:var(--text);}
+  .login-sub{color:var(--text-soft);font-size:13px;margin:2px 0 20px;}
+  .login-sep{height:1px;background:var(--border);margin:20px 0;}
+  .login-seccion-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--text-soft);letter-spacing:.4px;margin:0 0 10px;text-transform:uppercase;}
+
   .campo{margin-bottom:16px;}
   .campo label{display:block;font-size:12px;color:var(--text-soft);margin-bottom:6px;}
   .campo input, .campo select{
@@ -61,14 +64,53 @@
     background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:38px;
   }
   .campo input:focus,.campo select:focus{border-color:var(--amber);}
-  .campo-pass-wrap{position:relative;}
-  #btn-login{
-    width:100%;margin-top:6px;background:var(--amber);color:#1a1300;border:none;border-radius:8px;
-    padding:14px;font-size:15px;font-weight:700;cursor:pointer;transition:background .15s, transform .05s;
+
+  /* Dashboard publico (pantalla inicial) */
+  .dash-canvas-wrap{position:relative;height:150px;margin-bottom:10px;}
+  .dash-totales{display:flex;gap:10px;margin-bottom:4px;}
+  .dash-caja{
+    flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;
   }
-  #btn-login:active{transform:scale(0.98);}
-  #btn-login:hover{background:#ffb90f;}
-  .login-error{color:var(--rojo);font-size:13px;margin-top:12px;min-height:16px;text-align:center;}
+  .dash-caja label{display:block;font-size:9.5px;color:var(--text-soft);letter-spacing:.4px;margin-bottom:5px;}
+  .dash-caja .valor{font-family:'Roboto Mono',monospace;font-weight:700;font-size:15px;color:var(--text);}
+  .dash-caja .pct{font-family:'Roboto Mono',monospace;font-weight:700;font-size:19px;margin-top:2px;}
+  .dash-caja.armado .pct{color:var(--azul);}
+  .dash-caja.cargado .pct{color:var(--amber);}
+
+  /* Plan de Accion (alarma de cumplimiento) - reutilizable en varias vistas */
+  .plan-accion-display{
+    cursor:pointer;color:var(--azul);font-weight:600;text-align:center;font-family:'Roboto Mono',monospace;font-size:12px;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+  }
+  input.plan-accion-display{padding:9px 10px;font-size:13.5px;width:100%;}
+  div.plan-accion-display{padding:12px 10px;font-size:13px;margin-bottom:16px;}
+  .plan-accion-display.alerta{
+    color:#fff;border-color:var(--rojo);font-weight:700;animation:pulso-alerta 1s infinite;
+  }
+  @keyframes pulso-alerta{
+    0%,100%{background:var(--panel-2);}
+    50%{background:rgba(229,72,77,0.55);}
+  }
+
+  /* Botones de rol */
+  .rol-btn{
+    width:100%;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:transform .05s;
+  }
+  .rol-btn:active{transform:scale(0.98);}
+  .rol-btn.backus{background:var(--amber);color:#1a1300;}
+  .rol-btn.lavoro{background:var(--azul);color:#04182c;}
+  .subform{display:none;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:16px;margin:-2px 0 14px;}
+  .subform.open{display:block;}
+  .subform .campo{margin-bottom:12px;}
+  .subform .campo:last-of-type{margin-bottom:14px;}
+  .subform-btn{
+    width:100%;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;
+  }
+  .subform-btn.backus{background:var(--amber);color:#1a1300;}
+  .subform-btn.lavoro{background:var(--azul);color:#04182c;}
+
+  .login-error{color:var(--rojo);font-size:13px;margin-top:10px;min-height:16px;text-align:center;}
   .login-footer{text-align:center;color:var(--text-soft);font-size:11.5px;padding:16px 10px 20px;border-top:1px solid var(--border);letter-spacing:.2px;}
 
   /* ---------- APP SHELL ---------- */
@@ -107,17 +149,11 @@
   .campo-mini input:focus,.campo-mini textarea:focus{border-color:var(--amber);}
   .campo-mini.full{grid-column:1 / -1;}
 
-  /* Plan de Accion (alarma de cumplimiento) */
-  .campo-mini input.plan-accion-input{
-    cursor:pointer;color:var(--azul);font-weight:600;text-align:center;font-family:'Roboto Mono',monospace;font-size:12px;
-  }
-  .campo-mini input.plan-accion-input.alerta{
-    color:#fff;border-color:var(--rojo);font-weight:700;animation:pulso-alerta 1s infinite;
-  }
-  @keyframes pulso-alerta{
-    0%,100%{background:var(--panel-2);}
-    50%{background:rgba(229,72,77,0.55);}
-  }
+  /* Info simple para Lavoro (turno/fecha de solo lectura) */
+  .info-lavoro{display:flex;gap:10px;margin-bottom:14px;}
+  .info-lavoro .caja{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
+  .info-lavoro .caja label{display:block;font-size:9.5px;color:var(--text-soft);letter-spacing:.4px;margin-bottom:4px;}
+  .info-lavoro .caja span{font-family:'Roboto Mono',monospace;font-weight:600;font-size:13px;}
 
   /* Transportes programados + estatus */
   .fila-transp{display:flex;gap:10px;margin-top:14px;}
@@ -144,6 +180,8 @@
   /* Estatus de carga - mensaje */
   #panel-mensaje{display:none;}
   #panel-mensaje.open{display:block;}
+  #panel-mensaje-armado{display:none;}
+  #panel-mensaje-armado.open{display:block;}
   .mensaje-caja{
     background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;
     font-family:'Roboto Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;color:var(--text);
@@ -223,34 +261,69 @@
   @media (min-width:640px){
     .horas-grid{grid-template-columns:repeat(8,1fr);}
   }
+
+  /* ---------- PERMISOS POR ROL ---------- */
+  body.rol-lavoro .solo-backus{display:none !important;}
+  body.rol-backus .solo-lavoro{display:none !important;}
 </style>
 </head>
 <body>
 
-<!-- ================= LOGIN ================= -->
+<!-- ================= PANTALLA INICIAL (login + dashboard publico) ================= -->
 <div id="vista-login">
   <div class="login-card">
     <div class="login-strip"></div>
     <div class="login-body">
       <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
-      <p class="login-sub">SIC Digital VPO &mdash; inicio de turno</p>
+      <p class="login-sub">SIC Digital VPO &mdash; panel de turno</p>
 
-      <div class="campo">
-        <label for="in-turno">Turno</label>
-        <select id="in-turno">
-          <option value="" selected disabled>Selecciona un turno</option>
-          <option value="Turno 1 - Ma&ntilde;ana">Turno 1 - Ma&ntilde;ana</option>
-          <option value="Turno 2 - Tarde">Turno 2 - Tarde</option>
-          <option value="Turno 3 - Nocturno">Turno 3 - Nocturno</option>
-        </select>
+      <!-- Dashboard en vivo, visible sin necesidad de iniciar sesion -->
+      <div class="dash-canvas-wrap"><canvas id="grafico-inicio"></canvas></div>
+      <div class="dash-totales">
+        <div class="dash-caja armado">
+          <label>TOTAL ARMADOS</label>
+          <div class="valor" id="ini-total-armado">0 / 0</div>
+          <div class="pct" id="ini-pct-armado">0%</div>
+        </div>
+        <div class="dash-caja cargado">
+          <label>TOTAL CARGADOS</label>
+          <div class="valor" id="ini-total-cargado">0 / 0</div>
+          <div class="pct" id="ini-pct-cargado">0%</div>
+        </div>
       </div>
-      <div class="campo">
-        <label for="in-supervisor">Supervisor</label>
-        <input id="in-supervisor" type="text" placeholder="Nombre y Apellido" autocomplete="off">
+      <div class="plan-accion-display" id="alerta-inicio" title="Toca para silenciar la alarma">-</div>
+
+      <div class="login-sep"></div>
+      <p class="login-seccion-titulo">Ingresar como</p>
+
+      <button class="rol-btn backus" id="btn-rol-backus" type="button">Usuario Backus</button>
+      <div class="subform" id="form-backus">
+        <div class="campo">
+          <label for="in-turno-backus">Turno</label>
+          <select id="in-turno-backus">
+            <option value="" selected disabled>Selecciona un turno</option>
+            <option value="Turno 1 - Ma&ntilde;ana">Turno 1 - Ma&ntilde;ana</option>
+            <option value="Turno 2 - Tarde">Turno 2 - Tarde</option>
+            <option value="Turno 3 - Nocturno">Turno 3 - Nocturno</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="in-nombre-backus">Escribe tu nombre</label>
+          <input id="in-nombre-backus" type="text" placeholder="Nombre y Apellido" autocomplete="off">
+        </div>
+        <button class="subform-btn backus" id="btn-login-backus" type="button">Ingresar</button>
+        <div class="login-error" id="login-error-backus"></div>
       </div>
 
-      <button id="btn-login" type="button">Ingresar</button>
-      <div class="login-error" id="login-error"></div>
+      <button class="rol-btn lavoro" id="btn-rol-lavoro" type="button">Usuario Lavoro</button>
+      <div class="subform" id="form-lavoro">
+        <div class="campo">
+          <label for="in-nombre-lavoro">Escribe tu nombre</label>
+          <input id="in-nombre-lavoro" type="text" placeholder="Nombre y Apellido" autocomplete="off">
+        </div>
+        <button class="subform-btn lavoro" id="btn-login-lavoro" type="button">Ingresar</button>
+        <div class="login-error" id="login-error-lavoro"></div>
+      </div>
     </div>
     <div class="login-footer">Creado por Borys Orellana</div>
   </div>
@@ -261,15 +334,15 @@
   <div class="topbar">
     <div class="brand"><span class="t2" style="color:var(--amber)">SIC</span> DIGITAL</div>
     <div class="topbar-actions">
-      <button class="icon-btn" id="btn-reset" title="Reiniciar todo (nuevo reporte)">&#8635;</button>
+      <button class="icon-btn solo-backus" id="btn-reset" title="Reiniciar todo (nuevo reporte)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
     </div>
   </div>
 
   <main>
 
-    <!-- Cabecera -->
-    <section class="panel">
+    <!-- Cabecera (solo Backus) -->
+    <section class="panel solo-backus">
       <div class="marca-row">
         <span class="marca-ab">AB InBev</span>
         <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
@@ -278,7 +351,7 @@
         <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
         <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
         <div class="campo-mini"><label>Area</label><input id="c-area"></div>
-        <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-input" readonly value="-" title="Toca para silenciar la alarma"></div>
+        <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-display" readonly value="-" title="Toca para silenciar la alarma"></div>
         <div class="campo-mini full"><label>Monitoreo</label><input id="c-monitoreo"></div>
       </div>
 
@@ -303,8 +376,27 @@
       </div>
     </section>
 
-    <!-- Grafico -->
-    <section class="panel">
+    <!-- Info simple + estatus (solo Lavoro) -->
+    <section class="panel solo-lavoro">
+      <div class="info-lavoro">
+        <div class="caja"><label>TURNO</label><span id="lv-turno">-</span></div>
+        <div class="caja"><label>FECHA</label><span id="lv-fecha">-</span></div>
+      </div>
+      <div class="caja-estatus" id="btn-estatus-armado" style="width:100%;">
+        <span class="led"></span>
+        <span>ESTATUS DE ARMADO</span>
+      </div>
+      <div id="panel-mensaje-armado" style="margin-top:12px;">
+        <div class="mensaje-caja" id="mensaje-texto-armado"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-copiar-msg-armado">Copiar</button>
+          <button class="btn btn-amber" id="btn-whatsapp-msg-armado">Enviar por WhatsApp</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grafico (solo Backus) -->
+    <section class="panel solo-backus">
       <div class="panel-title" id="titulo-grafico">Unidades cargadas x horas planificadas<span class="tag" id="tag-total">0/0</span></div>
       <div class="chart-wrap"><canvas id="grafico"></canvas></div>
       <div class="estado-fila">
@@ -314,31 +406,34 @@
       </div>
     </section>
 
-    <!-- Editar datos por hora -->
+    <!-- Editar datos por hora (compartido, cada rol ve su campo) -->
     <section class="panel">
-      <div class="panel-title">Editar datos</div>
+      <div class="panel-title">
+        <span class="solo-backus">Editar datos</span>
+        <span class="solo-lavoro">Registrar Armados</span>
+      </div>
       <div class="horas-grid" id="horas-grid"></div>
 
-      <div class="campo-dato">
+      <div class="campo-dato solo-lavoro">
         <label>Armados (esta hora)</label>
         <input id="d-armado" inputmode="numeric" value="0">
       </div>
-      <div class="campo-dato">
-        <label>Cargados (esta hora)</label>
+      <div class="campo-dato solo-backus">
+        <label>Transportes Cargados (esta hora)</label>
         <input id="d-cargado" inputmode="numeric" value="0">
       </div>
 
       <button class="btn btn-amber" id="btn-actualizar" style="margin-top:6px;">Actualizar</button>
     </section>
 
-    <!-- Planes de reaccion -->
-    <section class="panel compact">
+    <!-- Planes de reaccion (solo Backus) -->
+    <section class="panel compact solo-backus">
       <div class="panel-title small">Planes de reacci&oacute;n</div>
       <div id="planes-lista"></div>
     </section>
 
-    <!-- Historico -->
-    <section class="panel">
+    <!-- Historico (solo Backus) -->
+    <section class="panel solo-backus">
       <div class="collapsible-head" data-target="hist-body">
         <div class="panel-title" style="margin:0;">Hist&oacute;rico<span class="chev" id="chev-hist">&#9662;</span></div>
       </div>
@@ -358,7 +453,7 @@
   "use strict";
 
   /* ============== CLAVES DE ALMACENAMIENTO ============== */
-  var SESSION_KEY = "t2sic_session";
+  var SESSION_KEY = "t2sic_session"; // guarda el ROL activo: "backus" | "lavoro"
   var DATA_KEY = "t2sic_data";
   var HIST_KEY = "t2sic_historico";
 
@@ -373,6 +468,7 @@
   /* ============== ESTADO ============== */
   var estado = null;
   var horaSelIdx = 0;
+  var rolActual = null; // "backus" | "lavoro"
 
   var TURNO_INICIO = {
     "Turno 1 - Ma\u00f1ana": 7,   // 7:00 am a 3:00 pm
@@ -419,7 +515,7 @@
 
   function datosPorDefecto(){
     return {
-      turno:"", supervisor:"",
+      turno:"", nombreBackus:"", nombreLavoro:"",
       subarea:"T2", fecha:"", area:"LOG",
       monitoreo:"Unidades cargadas x horas planificadas",
       transportesProgramados:74,
@@ -470,49 +566,82 @@
     return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   }
 
-  /* ============== LOGIN ============== */
-  function intentarLogin(){
-    var err = document.getElementById("login-error");
+  /* ============== PANTALLA INICIAL: BOTONES DE ROL ============== */
+  document.getElementById("btn-rol-backus").addEventListener("click", function(){
+    document.getElementById("form-lavoro").classList.remove("open");
+    document.getElementById("form-backus").classList.toggle("open");
+  });
+  document.getElementById("btn-rol-lavoro").addEventListener("click", function(){
+    document.getElementById("form-backus").classList.remove("open");
+    document.getElementById("form-lavoro").classList.toggle("open");
+  });
+
+  document.getElementById("btn-login-backus").addEventListener("click", function(){
+    var err = document.getElementById("login-error-backus");
     try{
-      var turno = document.getElementById("in-turno").value;
-      var supervisor = document.getElementById("in-supervisor").value.trim();
+      var turno = document.getElementById("in-turno-backus").value;
+      var nombre = document.getElementById("in-nombre-backus").value.trim();
       if(!turno){ err.textContent = "Selecciona un turno."; return; }
-      if(!supervisor){ err.textContent = "Escribe el nombre del supervisor."; return; }
+      if(!nombre){ err.textContent = "Escribe tu nombre."; return; }
       err.textContent = "";
-      cargarEstado();
+      if(!estado) cargarEstado();
       estado.turno = turno;
-      estado.supervisor = supervisor;
+      estado.nombreBackus = nombre;
       if(!horasCoincidenConTurno(estado.horas, turno)){
         estado.horas = generarHorasPorTurno(turno);
         horaSelIdx = 0;
       }
       guardarEstado();
-      guardarSesion(SESSION_KEY, "1");
-      mostrarApp();
+      guardarSesion(SESSION_KEY, "backus");
+      mostrarApp("backus");
     }catch(e){
       err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
     }
-  }
+  });
 
-  function mostrarApp(){
+  document.getElementById("btn-login-lavoro").addEventListener("click", function(){
+    var err = document.getElementById("login-error-lavoro");
+    try{
+      if(!estado) cargarEstado();
+      var nombre = document.getElementById("in-nombre-lavoro").value.trim();
+      if(!estado.turno){ err.textContent = "A\u00fan no hay un turno configurado. Pide a un supervisor Backus que ingrese primero."; return; }
+      if(!nombre){ err.textContent = "Escribe tu nombre."; return; }
+      err.textContent = "";
+      estado.nombreLavoro = nombre;
+      guardarEstado();
+      guardarSesion(SESSION_KEY, "lavoro");
+      mostrarApp("lavoro");
+    }catch(e){
+      err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
+    }
+  });
+
+  function mostrarApp(rol){
+    rolActual = rol;
+    document.body.classList.remove("rol-backus", "rol-lavoro");
+    document.body.classList.add("rol-" + rol);
     document.getElementById("vista-login").style.display = "none";
     document.getElementById("vista-app").style.display = "block";
     if(!estado) cargarEstado();
     render();
-    iniciarMonitorAlarma();
   }
 
   function cerrarSesion(){
-    detenerMonitorAlarma();
     borrarSesion(SESSION_KEY);
+    rolActual = null;
+    document.body.classList.remove("rol-backus", "rol-lavoro");
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
-    document.getElementById("in-turno").value = "";
-    document.getElementById("in-supervisor").value = "";
-    document.getElementById("login-error").textContent = "";
+    document.getElementById("in-turno-backus").value = "";
+    document.getElementById("in-nombre-backus").value = "";
+    document.getElementById("in-nombre-lavoro").value = "";
+    document.getElementById("login-error-backus").textContent = "";
+    document.getElementById("login-error-lavoro").textContent = "";
+    document.getElementById("form-backus").classList.remove("open");
+    document.getElementById("form-lavoro").classList.remove("open");
+    actualizarDashboardInicio();
   }
 
-  document.getElementById("btn-login").addEventListener("click", intentarLogin);
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
 
   document.getElementById("btn-reset").addEventListener("click", function(){
@@ -527,11 +656,13 @@
     if(!ok) return;
 
     var turnoActual = estado.turno;
-    var supervisorActual = estado.supervisor;
+    var nombreBackusActual = estado.nombreBackus;
+    var nombreLavoroActual = estado.nombreLavoro;
 
     estado = datosPorDefecto();
     estado.turno = turnoActual;
-    estado.supervisor = supervisorActual;
+    estado.nombreBackus = nombreBackusActual;
+    estado.nombreLavoro = nombreLavoroActual;
     estado.horas = generarHorasPorTurno(turnoActual);
     estado.fecha = fechaHoyStr();
     horaSelIdx = 0;
@@ -542,7 +673,7 @@
     toast("Reporte reiniciado. Listo para un nuevo d\u00eda.");
   });
 
-  /* ============== RENDER: CABECERA ============== */
+  /* ============== RENDER: CABECERA (Backus) ============== */
   function bindCabecera(){
     document.getElementById("c-subarea").value = estado.subarea;
     document.getElementById("c-fecha").value = estado.fecha;
@@ -552,7 +683,7 @@
     document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
     document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
-    document.getElementById("c-fecha").oninput = function(){ estado.fecha = this.value; guardarEstado(); };
+    document.getElementById("c-fecha").oninput = function(){ estado.fecha = this.value; guardarEstado(); bindInfoLavoro(); };
     document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarEstado(); };
     document.getElementById("c-monitoreo").oninput = function(){
       estado.monitoreo = this.value; guardarEstado();
@@ -563,20 +694,27 @@
       guardarEstado();
       dibujarGrafico();
       actualizarMensaje();
+      actualizarMensajeArmado();
       verificarAlarma();
     };
 
     actualizarUIPlanAccion();
   }
 
-  /* ============== ESTATUS DE CARGA (mensaje) ============== */
+  /* ============== INFO SIMPLE (Lavoro) ============== */
+  function bindInfoLavoro(){
+    document.getElementById("lv-turno").textContent = estado.turno || "-";
+    document.getElementById("lv-fecha").textContent = estado.fecha || "-";
+  }
+
+  /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   function generarMensaje(){
     calcularPorcentajes();
     var h = estado.horas[horaSelIdx] || {};
     var pct = estado.transportesProgramados > 0 ? Math.round(((h.acumCargado||0)/estado.transportesProgramados)*100) : 0;
     return "STATUS DE CARGA\n" +
       "Turno: " + (estado.turno || "-") + "\n" +
-      "Supervisor: " + (estado.supervisor || "-") + "\n" +
+      "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
@@ -596,14 +734,56 @@
   });
 
   document.getElementById("btn-copiar-msg").addEventListener("click", function(){
-    var texto = generarMensaje();
+    copiarTexto(generarMensaje());
+  });
+
+  document.getElementById("btn-whatsapp-msg").addEventListener("click", function(){
+    enviarPorWhatsapp(generarMensaje());
+  });
+
+  /* ============== ESTATUS DE ARMADO (mensaje Lavoro) ============== */
+  function generarMensajeArmado(){
+    calcularPorcentajes();
+    var h = estado.horas[horaSelIdx] || {};
+    var meta = estado.transportesProgramados || 0;
+    var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
+    return "STATUS DE ARMADO\n" +
+      "Turno: " + (estado.turno || "-") + "\n" +
+      "Encargado: " + (estado.nombreLavoro || "-") + "\n" +
+      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
+      "Fecha: " + (estado.fecha || "-") + "\n" +
+      "Hora: " + (h.hora || "-") + "\n" +
+      "Armado (acum.): " + (h.acumArmado||0) + " / " + meta + "\n" +
+      "Avance de armado: " + pctArmado + "%";
+  }
+
+  function actualizarMensajeArmado(){
+    var el = document.getElementById("mensaje-texto-armado");
+    if(el) el.textContent = generarMensajeArmado();
+  }
+
+  document.getElementById("btn-estatus-armado").addEventListener("click", function(){
+    var panel = document.getElementById("panel-mensaje-armado");
+    actualizarMensajeArmado();
+    panel.classList.toggle("open");
+  });
+
+  document.getElementById("btn-copiar-msg-armado").addEventListener("click", function(){
+    copiarTexto(generarMensajeArmado());
+  });
+
+  document.getElementById("btn-whatsapp-msg-armado").addEventListener("click", function(){
+    enviarPorWhatsapp(generarMensajeArmado());
+  });
+
+  function copiarTexto(texto){
     if(navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(texto).then(function(){ toast("Mensaje copiado"); })
         .catch(function(){ copiarFallback(texto); });
     } else {
       copiarFallback(texto);
     }
-  });
+  }
 
   function copiarFallback(texto){
     try{
@@ -619,12 +799,11 @@
     }catch(e){ toast("No se pudo copiar"); }
   }
 
-  document.getElementById("btn-whatsapp-msg").addEventListener("click", function(){
-    var texto = generarMensaje();
+  function enviarPorWhatsapp(texto){
     window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
-  });
+  }
 
-  /* ============== HORAS: SELECTOR + 2 CAMPOS ============== */
+  /* ============== HORAS: SELECTOR + CAMPOS (compartido) ============== */
   function renderHorasGrid(){
     var cont = document.getElementById("horas-grid");
     cont.innerHTML = "";
@@ -639,6 +818,7 @@
         bindDatosHora();
         dibujarGrafico();
         actualizarMensaje();
+        actualizarMensajeArmado();
       });
       cont.appendChild(btn);
     });
@@ -651,13 +831,13 @@
   }
 
   document.getElementById("d-armado").addEventListener("input", function(){
-    estado.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje();
+    estado.horas[horaSelIdx].armado = Number(this.value)||0; guardarEstado(); actualizarMensaje(); actualizarMensajeArmado();
   });
   document.getElementById("d-cargado").addEventListener("input", function(){
-    estado.horas[horaSelIdx].cargado = Number(this.value)||0; guardarEstado(); dibujarGrafico(); actualizarMensaje();
+    estado.horas[horaSelIdx].cargado = Number(this.value)||0; guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
 
-  /* ============== PLANES ============== */
+  /* ============== PLANES (solo Backus) ============== */
   function renderPlanes(){
     var cont = document.getElementById("planes-lista");
     cont.innerHTML = "";
@@ -675,10 +855,10 @@
     });
   }
 
-  /* ============== CALCULO + GRAFICO (canvas nativo, sin librerias externas) ============== */
-  // Ahora "armado"/"cargado" de cada hora son lo hecho EN ESA hora.
-  // Aqui se calcula el acumulado (suma) hora a hora para el grafico y
-  // el porcentaje de cumplimiento en vivo.
+  /* ============== CALCULO (compartido) ============== */
+  // "armado"/"cargado" de cada hora son lo hecho EN ESA hora.
+  // Aqui se calcula el acumulado (suma) hora a hora para los graficos y
+  // los porcentajes de avance/cumplimiento en vivo.
   function calcularPorcentajes(){
     var meta = estado.transportesProgramados || 0;
     var sumaArmado = 0, sumaCargado = 0;
@@ -688,10 +868,12 @@
       h.acumArmado = sumaArmado;
       h.acumCargado = sumaCargado;
       h.pct = meta > 0 ? sumaCargado / meta : 0;
+      h.pctArmado = meta > 0 ? sumaArmado / meta : 0;
     });
     return meta;
   }
 
+  /* ============== GRAFICO PRINCIPAL (solo Backus, canvas nativo) ============== */
   function dibujarGrafico(){
     var meta = calcularPorcentajes();
     var horas = estado.horas;
@@ -800,11 +982,76 @@
     document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(estado.transportesProgramados||0);
   }
 
+  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ============== */
+  function dibujarGraficoInicio(pctArmado, pctCargado){
+    var canvas = document.getElementById("grafico-inicio");
+    if(!canvas) return;
+    var wrap = canvas.parentElement;
+    var dpr = window.devicePixelRatio || 1;
+    var cssW = (wrap && wrap.clientWidth) || 260;
+    var cssH = 150;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    var padB = 22, padT = 22;
+    var chartH = cssH - padB - padT;
+    var barW = Math.min(52, cssW*0.16);
+    var gap = Math.min(56, cssW*0.18);
+    var startX = cssW/2 - (barW*2 + gap)/2;
+
+    function barra(x, pct, color, label){
+      var pctClamp = Math.max(0, Math.min(pct, 100));
+      var h = Math.max(2, (pctClamp/100) * chartH);
+      var y = padT + chartH - h;
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(x, padT, barW, chartH);
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, barW, h);
+      ctx.fillStyle = "#eef1f3";
+      ctx.font = "700 12px 'Roboto Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(Math.round(pctClamp) + "%", x + barW/2, y - 7);
+      ctx.fillStyle = "#8d99a3";
+      ctx.font = "9px Inter, sans-serif";
+      ctx.fillText(label, x + barW/2, cssH - 8);
+    }
+
+    barra(startX, pctArmado, "#4aa8ff", "ARMADO");
+    barra(startX + barW + gap, pctCargado, "#f2a900", "CARGADO");
+  }
+
+  function actualizarDashboardInicio(){
+    if(!estado) cargarEstado();
+    if(!estado){ return; }
+    calcularPorcentajes();
+    var meta = estado.transportesProgramados || 0;
+    var ultima = estado.horas[estado.horas.length-1] || {acumArmado:0, acumCargado:0};
+    var totalArmado = ultima.acumArmado || 0;
+    var totalCargado = ultima.acumCargado || 0;
+    var pctArmado = meta > 0 ? Math.round((totalArmado/meta)*100) : 0;
+    var pctCargado = meta > 0 ? Math.round((totalCargado/meta)*100) : 0;
+
+    document.getElementById("ini-total-armado").textContent = totalArmado + " / " + meta;
+    document.getElementById("ini-pct-armado").textContent = pctArmado + "%";
+    document.getElementById("ini-total-cargado").textContent = totalCargado + " / " + meta;
+    document.getElementById("ini-pct-cargado").textContent = pctCargado + "%";
+
+    dibujarGraficoInicio(pctArmado, pctCargado);
+    verificarAlarma();
+  }
+
   var _resizeTimer = null;
   window.addEventListener("resize", function(){
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(function(){
       if(estado && document.getElementById("vista-app").style.display !== "none"){ dibujarGrafico(); }
+      if(estado && document.getElementById("vista-login").style.display !== "none"){ actualizarDashboardInicio(); }
     }, 150);
   });
 
@@ -815,11 +1062,13 @@
     renderHorasGrid();
     guardarEnHistorico();
     actualizarMensaje();
+    actualizarMensajeArmado();
+    actualizarDashboardInicio();
     verificarAlarma();
     toast("Hora " + estado.horas[horaSelIdx].hora + " actualizada");
   });
 
-  /* ============== HISTORICO (tipo base de datos) ============== */
+  /* ============== HISTORICO (solo Backus) ============== */
   function guardarEnHistorico(){
     calcularPorcentajes();
     var lista = cargarHistorico();
@@ -831,7 +1080,8 @@
       fecha: estado.fecha,
       hora: h.hora,
       turno: estado.turno,
-      supervisor: estado.supervisor,
+      supervisor: estado.nombreBackus,
+      encargadoArmado: estado.nombreLavoro,
       subarea: estado.subarea,
       area: estado.area,
       transportesProgramados: estado.transportesProgramados,
@@ -888,6 +1138,9 @@
   }
 
   /* ============== PLAN DE ACCION / ALARMA DE CUMPLIMIENTO ============== */
+  /* Corre siempre (desde el arranque de la app), independiente de si hay
+     alguien con sesion iniciada, para que la alerta se vea/suene tambien
+     en la pantalla inicial. La logica de corte horario no cambia. */
   var alarmaActiva = false;
   var alarmaSonidoId = null;
   var monitorAlarmaId = null;
@@ -927,6 +1180,7 @@
   }
 
   function pctCumplimientoActual(){
+    if(!estado) return 0;
     calcularPorcentajes();
     var horas = estado.horas;
     if(!horas.length) return 0;
@@ -951,21 +1205,25 @@
   }
 
   function actualizarUIPlanAccion(){
-    var caja = document.getElementById("c-plan-accion");
-    if(!caja) return;
-    if(alarmaActiva){
-      caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
-      caja.classList.add("alerta");
-    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
-      var corte = TURNO_CORTE[estado.turno];
-      var hh = String(corte.h).padStart(2,"0");
-      var mm = String(corte.m).padStart(2,"0");
-      caja.value = "OK \u00b7 corte " + hh + ":" + mm;
-      caja.classList.remove("alerta");
-    } else {
-      caja.value = "-";
-      caja.classList.remove("alerta");
-    }
+    var cajas = document.querySelectorAll(".plan-accion-display");
+    cajas.forEach(function(caja){
+      var esInput = caja.tagName === "INPUT";
+      if(alarmaActiva){
+        var txtAlerta = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
+        if(esInput) caja.value = txtAlerta; else caja.textContent = txtAlerta;
+        caja.classList.add("alerta");
+      } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
+        var corte = TURNO_CORTE[estado.turno];
+        var hh = String(corte.h).padStart(2,"0");
+        var mm = String(corte.m).padStart(2,"0");
+        var txtOk = "OK \u00b7 corte " + hh + ":" + mm;
+        if(esInput) caja.value = txtOk; else caja.textContent = txtOk;
+        caja.classList.remove("alerta");
+      } else {
+        if(esInput) caja.value = "-"; else caja.textContent = "-";
+        caja.classList.remove("alerta");
+      }
+    });
   }
 
   function dispararAlarma(){
@@ -986,7 +1244,7 @@
   }
 
   function verificarAlarma(){
-    if(!estado || !estado.turno) return;
+    if(!estado || !estado.turno) { actualizarUIPlanAccion(); return; }
     if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){
       dispararAlarma();
     } else {
@@ -995,19 +1253,15 @@
   }
 
   function iniciarMonitorAlarma(){
-    detenerMonitorAlarma();
+    if(monitorAlarmaId) clearInterval(monitorAlarmaId);
     verificarAlarma();
     monitorAlarmaId = setInterval(verificarAlarma, 20000);
   }
 
-  function detenerMonitorAlarma(){
-    if(monitorAlarmaId){ clearInterval(monitorAlarmaId); monitorAlarmaId = null; }
-    if(alarmaSonidoId){ clearInterval(alarmaSonidoId); alarmaSonidoId = null; }
-    alarmaActiva = false;
-  }
-
-  document.getElementById("c-plan-accion").addEventListener("click", function(){
-    if(alarmaActiva){ silenciarAlarma(false); }
+  document.querySelectorAll(".plan-accion-display").forEach(function(el){
+    el.addEventListener("click", function(){
+      if(alarmaActiva){ silenciarAlarma(false); }
+    });
   });
 
   /* ============== COLAPSABLES ============== */
@@ -1023,20 +1277,27 @@
   /* ============== RENDER GENERAL ============== */
   function render(){
     bindCabecera();
+    bindInfoLavoro();
     renderHorasGrid();
     bindDatosHora();
     renderPlanes();
     dibujarGrafico();
     renderHistorico();
     actualizarMensaje();
+    actualizarMensajeArmado();
     verificarAlarma();
   }
 
   /* ============== INICIO ============== */
   window.addEventListener("DOMContentLoaded", function(){
-    if(leerSesion(SESSION_KEY) === "1"){
-      cargarEstado();
-      mostrarApp();
+    cargarEstado();
+    iniciarMonitorAlarma();
+    actualizarDashboardInicio();
+    setInterval(actualizarDashboardInicio, 8000);
+
+    var sesion = leerSesion(SESSION_KEY);
+    if(sesion === "backus" || sesion === "lavoro"){
+      mostrarApp(sesion);
     }
   });
 
