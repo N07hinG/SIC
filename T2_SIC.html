@@ -815,6 +815,7 @@
     try{
       var cuerpo = {
         clave: CLAVE_NUBE,
+        tipo: "en_vivo", // sincronizacion en tiempo real -> siempre va a la hoja EN_VIVO
         rol: rolActual,
         fecha: estado.fecha || "",
         turno: estado.turno || "",
@@ -894,16 +895,17 @@
   // que hoja venga, y reconstruye el arbol de datos original.
   function reconstruirEstadoDesdeNube(dataPorHoja){
     var porClave = {};
-    ["BACKUS","EXTERNO","SORTING"].forEach(function(hoja){
-      (dataPorHoja[hoja] || []).forEach(function(fila){
-        var clave = fila.clave_dato;
-        if(clave === undefined || clave === null || clave === "") return;
-        var t = parseTimestampNube(fila.timestamp);
-        var actual = porClave[clave];
-        if(!actual || t >= actual.t){
-          porClave[clave] = { valor: fila.valor_dato, t: t };
-        }
-      });
+    // La sincronizacion en tiempo real vive UNICAMENTE en la hoja EN_VIVO.
+    // BACKUS/EXTERNO/SORTING ya no se usan para esto: esas 3 hojas ahora
+    // solo guardan 1 fila de reporte por status enviado a WhatsApp.
+    (dataPorHoja["EN_VIVO"] || []).forEach(function(fila){
+      var clave = fila.clave_dato;
+      if(clave === undefined || clave === null || clave === "") return;
+      var t = parseTimestampNube(fila.timestamp);
+      var actual = porClave[clave];
+      if(!actual || t >= actual.t){
+        porClave[clave] = { valor: fila.valor_dato, t: t };
+      }
     });
 
     var claves = Object.keys(porClave);
@@ -921,6 +923,40 @@
     if(!reconstruido.sortingPorTurno) reconstruido.sortingPorTurno = {};
     if(reconstruido.nombreSorting === undefined) reconstruido.nombreSorting = "";
     return reconstruido;
+  }
+
+  /* ============== REPORTE DE STATUS (1 fila por click en "Enviar por WhatsApp") ==============
+     Esto es independiente de la sincronizacion en tiempo real (EN_VIVO).
+     Guarda SOLO 1 fila en la hoja BACKUS/EXTERNO/SORTING segun el rol
+     activo. Si ya existe esa fecha+turno+hora_reporte, el backend la
+     actualiza en vez de duplicarla. */
+  async function enviarReporteStatus(camposReporte, mensajeExacto){
+    if(!rolActual) return;
+    try{
+      var cuerpo = {
+        clave: CLAVE_NUBE,
+        tipo: "reporte",
+        rol: rolActual,
+        fecha: estado.fecha || "",
+        turno: estado.turno || "",
+        usuario: nombreUsuarioActualParaNube(),
+        comentario_status: mensajeExacto || ""
+      };
+      if(camposReporte && typeof camposReporte === "object"){
+        Object.keys(camposReporte).forEach(function(k){ cuerpo[k] = camposReporte[k]; });
+      }
+      var resp = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(cuerpo)
+      });
+      if(!resp.ok) throw new Error("HTTP " + resp.status);
+      var json = null;
+      try{ json = await resp.json(); }catch(e){ json = null; }
+      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
+    }catch(err){
+      console.error("No se pudo enviar el reporte de status a la nube:", err);
+    }
   }
 
   async function cargarDeNube(){
@@ -1200,7 +1236,20 @@
   });
 
   document.getElementById("btn-whatsapp-msg").addEventListener("click", function(){
-    enviarPorWhatsapp(generarMensaje());
+    var mensaje = generarMensaje();
+    enviarPorWhatsapp(mensaje);
+    var reg = registroActual();
+    var h = (reg && reg.horas[horaSelIdx]) || {};
+    var meta = reg ? (reg.transportesProgramados || 0) : 0;
+    var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
+    enviarReporteStatus({
+      hora_reporte: h.hora || "",
+      armados_meta: meta,
+      cargados_meta: meta,
+      armados_hoy: h.acumArmado || 0,
+      cargados_hoy: h.acumCargado || 0,
+      eficiencia: pct
+    }, mensaje);
   });
 
   /* ============== ESTATUS DE ARMADO (mensaje Lavoro) ============== */
@@ -1236,7 +1285,20 @@
   });
 
   document.getElementById("btn-whatsapp-msg-armado").addEventListener("click", function(){
-    enviarPorWhatsapp(generarMensajeArmado());
+    var mensaje = generarMensajeArmado();
+    enviarPorWhatsapp(mensaje);
+    var reg = registroActual();
+    var h = (reg && reg.horas[horaSelIdx]) || {};
+    var meta = reg ? (reg.transportesProgramados || 0) : 0;
+    var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
+    enviarReporteStatus({
+      hora_reporte: h.hora || "",
+      armados_meta: meta,
+      cargados_meta: meta,
+      armados_hoy: h.acumArmado || 0,
+      cargados_hoy: h.acumCargado || 0,
+      eficiencia: pctArmado
+    }, mensaje);
   });
 
   function copiarTexto(texto){
@@ -2094,7 +2156,22 @@
     copiarTexto(generarMensajeSorting());
   });
   document.getElementById("btn-whatsapp-msg-sorting").addEventListener("click", function(){
-    enviarPorWhatsapp(generarMensajeSorting());
+    var mensaje = generarMensajeSorting();
+    enviarPorWhatsapp(mensaje);
+    var reg = registroSortingActual();
+    var totalCajas = 0;
+    (reg ? reg.bloques : []).forEach(function(b){ if(b.marcado) totalCajas += (b.cajas || 0); });
+    var ahora = new Date();
+    var horaActual = String(ahora.getHours()).padStart(2,"0") + ":" + String(ahora.getMinutes()).padStart(2,"0") + ":" + String(ahora.getSeconds()).padStart(2,"0");
+    var eficiencia = Math.round((totalCajas / META_SORTING) * 100);
+    enviarReporteStatus({
+      hora_reporte: horaActual,
+      armados_meta: META_SORTING,
+      cargados_meta: META_SORTING,
+      armados_hoy: totalCajas,
+      cargados_hoy: totalCajas,
+      eficiencia: eficiencia
+    }, mensaje);
   });
 
   /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ==============
