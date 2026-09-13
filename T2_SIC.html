@@ -251,6 +251,38 @@
   }
   .plan-row input:focus{border-color:var(--amber);}
 
+  /* ---------- SECCION BLOQUES (solo Sorting) ---------- */
+  .sorting-reloj{
+    font-family:'Roboto Mono',monospace;font-weight:700;font-size:19px;text-align:center;
+    color:var(--amber);background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:12px 10px;
+  }
+  .bloque-item{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--border);}
+  .bloque-item:last-child{border-bottom:none;}
+  .bloque-item.atrasado{background:rgba(229,72,77,0.14);border-radius:8px;padding:11px 8px;margin:0 -8px;}
+  .bloque-check{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0;}
+  .bloque-check input[type="checkbox"]{width:19px;height:19px;flex:none;accent-color:var(--amber);cursor:pointer;}
+  .bloque-nombre{font-size:13.5px;color:var(--text);line-height:1.35;}
+  .bloque-item.atrasado .bloque-nombre{color:var(--rojo);font-weight:700;}
+  .bloque-nombre small{display:block;color:var(--text-soft);font-size:10.5px;font-weight:400;margin-top:2px;}
+  .bloque-item.atrasado .bloque-nombre small{color:var(--rojo);opacity:.85;}
+  .bloque-cajas{
+    width:96px;flex:none;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
+    padding:9px 6px;font-size:13px;text-align:center;outline:none;font-family:'Roboto Mono',monospace;font-weight:600;
+  }
+  .bloque-cajas:focus{border-color:var(--amber);}
+  .bloque-cajas:disabled{opacity:.35;cursor:not-allowed;}
+  .sorting-meta-barra-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;height:16px;overflow:hidden;margin-top:2px;}
+  .sorting-meta-barra{height:100%;width:0%;background:var(--amber);transition:width .3s ease, background .3s ease;}
+  .sorting-meta-barra.completa{background:var(--verde);}
+  .sorting-total-personal{
+    margin-top:12px;font-family:'Roboto Mono',monospace;font-weight:700;font-size:13.5px;text-align:center;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);
+  }
+  .sorting-check-row{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13.5px;color:var(--text);cursor:pointer;}
+  .sorting-check-row input[type="checkbox"]{width:19px;height:19px;accent-color:var(--amber);cursor:pointer;}
+  #panel-mensaje-sorting{display:none;}
+  #panel-mensaje-sorting.open{display:block;}
+
   .collapsible-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
   .chev{color:var(--text-soft);transition:transform .2s;font-size:13px;}
   .chev.open{transform:rotate(180deg);}
@@ -277,8 +309,10 @@
   }
 
   /* ---------- PERMISOS POR ROL ---------- */
-  body.rol-lavoro .solo-backus{display:none !important;}
-  body.rol-backus .solo-lavoro{display:none !important;}
+  body.rol-lavoro .solo-backus, body.rol-lavoro .solo-sorting{display:none !important;}
+  body.rol-backus .solo-lavoro, body.rol-backus .solo-sorting{display:none !important;}
+  body.rol-sorting .solo-backus, body.rol-sorting .solo-lavoro{display:none !important;}
+  body.rol-sorting .oculto-sorting{display:none !important;}
 </style>
 </head>
 <body>
@@ -297,6 +331,7 @@
           <div class="user-menu" id="user-menu">
             <div class="user-menu-item" id="opt-abinbev" data-rol="backus">ABInBev</div>
             <div class="user-menu-item" id="opt-externo" data-rol="lavoro">Externo</div>
+            <div class="user-menu-item" id="opt-sorting" data-rol="sorting">Sorting</div>
           </div>
         </div>
       </div>
@@ -421,7 +456,51 @@
       </div>
     </section>
 
-    <!-- Grafico (solo Backus) -->
+    <!-- ================= SECCION BLOQUES (solo Sorting) ================= -->
+    <section class="panel solo-sorting">
+      <div class="marca-row">
+        <span class="marca-ab">AB InBev</span>
+        <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
+      </div>
+      <div class="sorting-reloj" id="sorting-reloj">--/--/---- &middot; --:--:--</div>
+    </section>
+
+    <section class="panel solo-sorting">
+      <div class="panel-title small">Bloques</div>
+      <div id="bloques-lista"></div>
+    </section>
+
+    <section class="panel solo-sorting">
+      <div class="panel-title small">Avance de Meta Diaria<span class="tag" id="sorting-meta-tag">0 / 35,000</span></div>
+      <div class="sorting-meta-barra-wrap"><div class="sorting-meta-barra" id="sorting-meta-barra"></div></div>
+    </section>
+
+    <section class="panel solo-sorting">
+      <div class="panel-title small">Fuerza Laboral</div>
+      <div class="grid2">
+        <div class="campo-mini"><label>Personal Fijo</label><input id="sorting-personal-fijo" inputmode="numeric" value="12"></div>
+        <div class="campo-mini"><label>Personal Refuerzo</label><input id="sorting-personal-refuerzo" inputmode="numeric" value="0"></div>
+      </div>
+      <div class="sorting-total-personal" id="sorting-total-personal">Total Personal: 12 personas</div>
+      <label class="sorting-check-row">
+        <input type="checkbox" id="sorting-apoyo-validacion">
+        <span>Apoyo con Validaci&oacute;n</span>
+      </label>
+    </section>
+
+    <section class="panel solo-sorting">
+      <div class="caja-estatus" id="btn-estatus-sorting" style="width:100%;">
+        <span class="led"></span>
+        <span>ESTATUS DE BLOQUES</span>
+      </div>
+      <div id="panel-mensaje-sorting" style="margin-top:12px;">
+        <div class="mensaje-caja" id="mensaje-texto-sorting"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-copiar-msg-sorting">Copiar</button>
+          <button class="btn btn-amber" id="btn-whatsapp-msg-sorting">Enviar por WhatsApp</button>
+        </div>
+      </div>
+    </section>
     <section class="panel solo-backus">
       <div class="panel-title" id="titulo-grafico">Unidades cargadas x horas planificadas<span class="tag" id="tag-total">0/0</span></div>
       <div class="chart-wrap"><canvas id="grafico"></canvas></div>
@@ -432,8 +511,8 @@
       </div>
     </section>
 
-    <!-- Editar datos por hora (compartido, cada rol ve su campo) -->
-    <section class="panel">
+    <!-- Editar datos por hora (compartido, cada rol ve su campo; no aplica a Sorting) -->
+    <section class="panel oculto-sorting">
       <div class="panel-title">
         <span class="solo-backus">Editar datos</span>
         <span class="solo-lavoro">Registrar Armados</span>
@@ -582,12 +661,69 @@
     return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
   }
 
+  /* ============== DATOS DE SORTING (BLOQUES) - SEPARADOS POR TURNO+FECHA ==============
+     Estructura totalmente independiente de "datosPorTurno" (ABInBev/Externo).
+     Nunca se mezcla con los datos de armado/cargado. */
+  var META_SORTING = 35000;
+
+  function bloquesSortingPorDefecto(){
+    return [
+      { id:1, nombre:"Bloque 1", entrega:"10:00am", entregaVacia:false, nota:"Lo usa T1", corteH:10, corteM:0,  marcado:false, cajas:0 },
+      { id:2, nombre:"Bloque 2", entrega:"1:30pm",  entregaVacia:false, nota:"",          corteH:13, corteM:30, marcado:false, cajas:0 },
+      { id:3, nombre:"Bloque 3", entrega:"3:45pm",  entregaVacia:false, nota:"",          corteH:15, corteM:45, marcado:false, cajas:0 },
+      { id:4, nombre:"Bloque 4", entrega:"",        entregaVacia:true,  nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
+      { id:5, nombre:"Bloque 5", entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
+      { id:6, nombre:"Fila 4",   entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 }
+    ];
+  }
+
+  // Crea (crear=true) o consulta (crear=false) el registro de Sorting de
+  // un turno especifico en una fecha especifica. Igual que con los
+  // registros de ABInBev/Externo, nunca se comparte entre turnos.
+  function obtenerRegistroSorting(fecha, turno, crear){
+    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
+    var fk = claveFecha(fecha);
+    if(crear){
+      if(!estado.sortingPorTurno[fk]) estado.sortingPorTurno[fk] = {};
+      if(!estado.sortingPorTurno[fk][turno]){
+        estado.sortingPorTurno[fk][turno] = {
+          bloques: bloquesSortingPorDefecto(),
+          personalFijo: 12,
+          personalRefuerzo: 0,
+          apoyoValidacion: false
+        };
+      }
+      return estado.sortingPorTurno[fk][turno];
+    }
+    if(estado.sortingPorTurno[fk] && estado.sortingPorTurno[fk][turno]){
+      return estado.sortingPorTurno[fk][turno];
+    }
+    return { bloques: bloquesSortingPorDefecto(), personalFijo:12, personalRefuerzo:0, apoyoValidacion:false };
+  }
+
+  function registroSortingActual(){
+    if(!estado.turno) return null;
+    return obtenerRegistroSorting(estado.fecha, estado.turno, true);
+  }
+
+  // Un bloque esta "atrasado" si tiene hora de corte, no esta marcado, y
+  // la hora actual ya paso esa hora de corte.
+  function bloqueEstaAtrasado(bloque){
+    if(bloque.corteH === null || bloque.corteH === undefined) return false;
+    if(bloque.marcado) return false;
+    var ahora = new Date();
+    var ahoraMin = ahora.getHours()*60 + ahora.getMinutes();
+    var corteMin = bloque.corteH*60 + (bloque.corteM||0);
+    return ahoraMin >= corteMin;
+  }
+
   function datosPorDefecto(){
     return {
-      turno:"", nombreBackus:"", nombreLavoro:"",
+      turno:"", nombreBackus:"", nombreLavoro:"", nombreSorting:"",
       subarea:"T2", fecha:"", area:"LOG",
       monitoreo:"Unidades cargadas x horas planificadas",
       datosPorTurno:{},
+      sortingPorTurno:{},
       planes:[
         {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
         {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
@@ -616,6 +752,8 @@
     }catch(e){ estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
     if(!estado.fecha) estado.fecha = fechaHoyStr();
     if(!estado.datosPorTurno) estado.datosPorTurno = {};
+    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
+    if(estado.nombreSorting === undefined) estado.nombreSorting = "";
     // Migracion de formato antiguo (una sola tabla de horas compartida
     // para todos los turnos) hacia el nuevo formato separado por turno.
     if(estado.horas && estado.horas.length && estado.turno){
@@ -698,6 +836,9 @@
     if(rol === "backus"){
       elFormLoginTitulo.textContent = "Ingresar \u00b7 ABInBev";
       elCampoPass.style.display = "block";
+    } else if(rol === "sorting"){
+      elFormLoginTitulo.textContent = "Ingresar \u00b7 Sorting";
+      elCampoPass.style.display = "none";
     } else {
       elFormLoginTitulo.textContent = "Ingresar \u00b7 Externo";
       elCampoPass.style.display = "none";
@@ -707,11 +848,12 @@
 
   document.getElementById("opt-abinbev").addEventListener("click", function(){ abrirFormularioLogin("backus"); });
   document.getElementById("opt-externo").addEventListener("click", function(){ abrirFormularioLogin("lavoro"); });
+  document.getElementById("opt-sorting").addEventListener("click", function(){ abrirFormularioLogin("sorting"); });
 
   document.getElementById("btn-login-confirmar").addEventListener("click", function(){
     var err = document.getElementById("login-error-generico");
     try{
-      if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev o Externo primero."; return; }
+      if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev, Externo o Sorting primero."; return; }
       var turno = document.getElementById("in-turno-login").value;
       var nombre = document.getElementById("in-nombre-login").value.trim();
       if(!turno){ err.textContent = "Selecciona tu turno."; return; }
@@ -723,11 +865,18 @@
       err.textContent = "";
       if(!estado) cargarEstado();
       estado.turno = turno;
-      if(rolSeleccionado === "backus"){ estado.nombreBackus = nombre; }
-      else { estado.nombreLavoro = nombre; }
-      // Aseguramos que exista el registro de ESTE turno/fecha, sin tocar
-      // ni sobreescribir los datos de ningun otro turno.
-      obtenerRegistro(estado.fecha, turno, true);
+      // Cada rol guarda su propio registro, por su propia clave
+      // fecha+turno. Nunca se mezclan entre si.
+      if(rolSeleccionado === "backus"){
+        estado.nombreBackus = nombre;
+        obtenerRegistro(estado.fecha, turno, true);
+      } else if(rolSeleccionado === "sorting"){
+        estado.nombreSorting = nombre;
+        obtenerRegistroSorting(estado.fecha, turno, true);
+      } else {
+        estado.nombreLavoro = nombre;
+        obtenerRegistro(estado.fecha, turno, true);
+      }
       horaSelIdx = 0;
       guardarEstado();
       guardarSesion(SESSION_KEY, rolSeleccionado);
@@ -739,7 +888,7 @@
 
   function mostrarApp(rol){
     rolActual = rol;
-    document.body.classList.remove("rol-backus", "rol-lavoro");
+    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.body.classList.add("rol-" + rol);
     document.getElementById("vista-login").style.display = "none";
     document.getElementById("vista-app").style.display = "block";
@@ -751,7 +900,7 @@
     borrarSesion(SESSION_KEY);
     rolActual = null;
     rolSeleccionado = null;
-    document.body.classList.remove("rol-backus", "rol-lavoro");
+    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
     document.getElementById("in-turno-login").value = "";
@@ -760,6 +909,7 @@
     document.getElementById("login-error-generico").textContent = "";
     elFormLogin.classList.remove("open");
     cerrarMenuUsuario();
+    detenerAlarmaSorting();
     actualizarDashboardInicio();
   }
 
@@ -1546,6 +1696,280 @@
     });
   });
 
+  /* ============== SORTING: RELOJ EN TIEMPO REAL ============== */
+  function actualizarRelojSorting(){
+    var el = document.getElementById("sorting-reloj");
+    if(!el) return;
+    var d = new Date();
+    var dd = String(d.getDate()).padStart(2,"0");
+    var mm = String(d.getMonth()+1).padStart(2,"0");
+    var yy = d.getFullYear();
+    var hh = String(d.getHours()).padStart(2,"0");
+    var mi = String(d.getMinutes()).padStart(2,"0");
+    var ss = String(d.getSeconds()).padStart(2,"0");
+    el.textContent = dd + "/" + mm + "/" + yy + " \u00b7 " + hh + ":" + mi + ":" + ss;
+  }
+
+  /* ============== SORTING: LISTA DE BLOQUES ============== */
+  // Construye la lista completa de bloques (checkbox + input de cajas).
+  // Se llama una vez por sesion/render; los cambios puntuales (marcar,
+  // escribir cajas) actualizan el DOM existente sin reconstruir todo,
+  // para no perder el foco mientras el usuario escribe.
+  function renderBloques(){
+    var reg = registroSortingActual();
+    var cont = document.getElementById("bloques-lista");
+    if(!reg || !cont) return;
+    cont.innerHTML = "";
+    reg.bloques.forEach(function(b, i){
+      var atrasado = bloqueEstaAtrasado(b);
+      var detalle = [];
+      if(b.entregaVacia) detalle.push("Entrega [ ]");
+      else if(b.entrega) detalle.push("Entrega " + b.entrega);
+      if(b.nota) detalle.push(b.nota);
+      var fila = document.createElement("div");
+      fila.className = "bloque-item" + (atrasado ? " atrasado" : "");
+      fila.innerHTML =
+        '<label class="bloque-check">' +
+          '<input type="checkbox" class="bloque-chk" data-i="' + i + '"' + (b.marcado ? " checked" : "") + '>' +
+          '<span class="bloque-nombre">' + escapeAttr(b.nombre) +
+            (detalle.length ? ('<small>' + escapeAttr(detalle.join(" \u00b7 ")) + '</small>') : '') +
+          '</span>' +
+        '</label>' +
+        '<input type="text" inputmode="numeric" class="bloque-cajas" data-i="' + i + '" placeholder="Cajas" value="' + (b.cajas || 0) + '"' + (b.marcado ? "" : " disabled") + '>';
+      cont.appendChild(fila);
+    });
+
+    cont.querySelectorAll(".bloque-chk").forEach(function(chk){
+      chk.addEventListener("change", function(){
+        var reg2 = registroSortingActual();
+        if(!reg2) return;
+        var i = Number(this.dataset.i);
+        reg2.bloques[i].marcado = this.checked;
+        guardarEstado();
+        var fila = this.closest(".bloque-item");
+        var inputCajas = fila ? fila.querySelector(".bloque-cajas") : null;
+        if(inputCajas) inputCajas.disabled = !this.checked;
+        if(fila) fila.classList.toggle("atrasado", bloqueEstaAtrasado(reg2.bloques[i]));
+        actualizarMetaSorting();
+        actualizarMensajeSorting();
+        verificarAlarmaSorting();
+      });
+    });
+
+    cont.querySelectorAll(".bloque-cajas").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var reg2 = registroSortingActual();
+        if(!reg2) return;
+        var i = Number(this.dataset.i);
+        var valor = Number(this.value.replace(/[^0-9]/g, "")) || 0;
+        if(valor > 30000){ valor = 30000; }
+        this.value = valor;
+        reg2.bloques[i].cajas = valor;
+        guardarEstado();
+        actualizarMetaSorting();
+        actualizarMensajeSorting();
+      });
+      inp.addEventListener("blur", function(){
+        var reg2 = registroSortingActual();
+        if(!reg2) return;
+        var i = Number(this.dataset.i);
+        var valor = Number(this.value) || 0;
+        if(valor > 0 && valor < 5000){
+          valor = 5000;
+          this.value = valor;
+          reg2.bloques[i].cajas = valor;
+          guardarEstado();
+          actualizarMetaSorting();
+          actualizarMensajeSorting();
+          toast("El m\u00ednimo permitido es 5,000 cajas.");
+        }
+      });
+    });
+  }
+
+  // Refresca SOLO el resaltado en rojo de "atrasado" en las filas ya
+  // pintadas, sin reconstruir los inputs (para no interrumpir si el
+  // usuario esta escribiendo en ese momento).
+  function actualizarAtrasoVisualBloques(){
+    var reg = registroSortingActual();
+    var cont = document.getElementById("bloques-lista");
+    if(!reg || !cont) return;
+    var filas = cont.querySelectorAll(".bloque-item");
+    filas.forEach(function(fila, i){
+      if(!reg.bloques[i]) return;
+      fila.classList.toggle("atrasado", bloqueEstaAtrasado(reg.bloques[i]));
+    });
+  }
+
+  /* ============== SORTING: AVANCE DE META DIARIA ============== */
+  function actualizarMetaSorting(){
+    var reg = registroSortingActual();
+    if(!reg) return;
+    var total = 0;
+    reg.bloques.forEach(function(b){ if(b.marcado) total += (b.cajas || 0); });
+    var tag = document.getElementById("sorting-meta-tag");
+    if(tag) tag.textContent = total.toLocaleString("es-PE") + " / " + META_SORTING.toLocaleString("es-PE");
+    var barra = document.getElementById("sorting-meta-barra");
+    if(barra){
+      var pct = Math.max(0, Math.min(100, (total / META_SORTING) * 100));
+      barra.style.width = pct + "%";
+      barra.classList.toggle("completa", total >= META_SORTING);
+    }
+    return total;
+  }
+
+  /* ============== SORTING: FUERZA LABORAL ============== */
+  function bindFuerzaLaboral(){
+    var reg = registroSortingActual();
+    if(!reg) return;
+    var elFijo = document.getElementById("sorting-personal-fijo");
+    var elRefuerzo = document.getElementById("sorting-personal-refuerzo");
+    var elApoyo = document.getElementById("sorting-apoyo-validacion");
+    elFijo.value = reg.personalFijo;
+    elRefuerzo.value = reg.personalRefuerzo;
+    elApoyo.checked = !!reg.apoyoValidacion;
+    actualizarTotalPersonalSorting();
+
+    elFijo.oninput = function(){
+      var r = registroSortingActual();
+      if(!r) return;
+      r.personalFijo = Number(this.value) || 0;
+      guardarEstado();
+      actualizarTotalPersonalSorting();
+      actualizarMensajeSorting();
+    };
+    elRefuerzo.oninput = function(){
+      var r = registroSortingActual();
+      if(!r) return;
+      r.personalRefuerzo = Number(this.value) || 0;
+      guardarEstado();
+      actualizarTotalPersonalSorting();
+      actualizarMensajeSorting();
+    };
+    elApoyo.onchange = function(){
+      var r = registroSortingActual();
+      if(!r) return;
+      r.apoyoValidacion = this.checked;
+      guardarEstado();
+      actualizarMensajeSorting();
+    };
+  }
+
+  function actualizarTotalPersonalSorting(){
+    var reg = registroSortingActual();
+    if(!reg) return;
+    var total = (reg.personalFijo || 0) + (reg.personalRefuerzo || 0);
+    var el = document.getElementById("sorting-total-personal");
+    if(el) el.textContent = "Total Personal: " + total + " personas";
+    return total;
+  }
+
+  /* ============== SORTING: MENSAJE DE ESTATUS / WHATSAPP ============== */
+  function generarMensajeSorting(){
+    var reg = registroSortingActual();
+    if(!reg) return "";
+    var ahora = new Date();
+    var hhmmss = String(ahora.getHours()).padStart(2,"0") + ":" + String(ahora.getMinutes()).padStart(2,"0") + ":" + String(ahora.getSeconds()).padStart(2,"0");
+    var totalPersonal = (reg.personalFijo||0) + (reg.personalRefuerzo||0);
+    var totalCajas = 0;
+
+    var lineas = [];
+    lineas.push("*REPORTE DE BLOQUES - SORTING*");
+    lineas.push("Turno: " + nombreCortoTurno(estado.turno));
+    lineas.push("Encargado: " + (estado.nombreSorting || "-"));
+    lineas.push("Fecha: " + (estado.fecha || "-"));
+    lineas.push("Hora de Env\u00edo: " + hhmmss);
+    lineas.push("");
+    lineas.push("*BLOQUES ENTREGADOS:*");
+    reg.bloques.forEach(function(b){
+      if(b.marcado) totalCajas += (b.cajas || 0);
+      var check = b.marcado ? "\u2611" : "\u2610";
+      var partes = [check + " " + b.nombre];
+      if(b.entregaVacia) partes.push("[ ]");
+      else if(b.entrega) partes.push(b.entrega);
+      partes.push((b.cajas || 0) + " Cajas");
+      if(b.nota) partes.push(b.nota);
+      var linea = partes.join(" - ");
+      if(bloqueEstaAtrasado(b)) linea += " [\u26A0 ATRASADO]";
+      lineas.push(linea);
+    });
+    lineas.push("");
+    lineas.push("*TOTAL DEL TURNO:* " + totalCajas + " / " + META_SORTING + " Cajas");
+    lineas.push("*FUERZA LABORAL:*");
+    lineas.push("- Personal Fijo: " + (reg.personalFijo||0) + " personas");
+    lineas.push("- Personal Refuerzo: " + (reg.personalRefuerzo||0) + " personas");
+    lineas.push("- Total Personal en Turno: " + totalPersonal + " personas");
+    lineas.push("- Apoyo con Validaci\u00f3n: " + (reg.apoyoValidacion ? "SI" : "NO"));
+    lineas.push("");
+    lineas.push("Por favor confirmar recepci\u00f3n.");
+    return lineas.join("\n");
+  }
+
+  function actualizarMensajeSorting(){
+    var el = document.getElementById("mensaje-texto-sorting");
+    if(el) el.textContent = generarMensajeSorting();
+  }
+
+  document.getElementById("btn-estatus-sorting").addEventListener("click", function(){
+    var panel = document.getElementById("panel-mensaje-sorting");
+    actualizarMensajeSorting();
+    panel.classList.toggle("open");
+  });
+  document.getElementById("btn-copiar-msg-sorting").addEventListener("click", function(){
+    copiarTexto(generarMensajeSorting());
+  });
+  document.getElementById("btn-whatsapp-msg-sorting").addEventListener("click", function(){
+    enviarPorWhatsapp(generarMensajeSorting());
+  });
+
+  /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ==============
+     Independiente de la alarma de armado/cargado de ABInBev. Si algun
+     bloque con hora de corte no esta marcado y ya paso su hora, suena
+     una alerta y ese bloque se resalta en rojo. */
+  var alarmaSortingActiva = false;
+  var alarmaSortingSonidoId = null;
+  var monitorAlarmaSortingId = null;
+
+  function dispararAlarmaSorting(){
+    if(alarmaSortingActiva) return;
+    alarmaSortingActiva = true;
+    if(alarmaSortingSonidoId) clearInterval(alarmaSortingSonidoId);
+    reproducirBeep();
+    alarmaSortingSonidoId = setInterval(reproducirBeep, 1500);
+    toast("\u26A0 Hay bloques atrasados sin marcar.");
+  }
+
+  function detenerAlarmaSorting(){
+    alarmaSortingActiva = false;
+    if(alarmaSortingSonidoId){ clearInterval(alarmaSortingSonidoId); alarmaSortingSonidoId = null; }
+  }
+
+  function verificarAlarmaSorting(){
+    if(rolActual !== "sorting" || !estado || !estado.turno){ detenerAlarmaSorting(); return; }
+    var reg = registroSortingActual();
+    if(!reg){ detenerAlarmaSorting(); return; }
+    var hayAtraso = reg.bloques.some(function(b){ return bloqueEstaAtrasado(b); });
+    if(hayAtraso) dispararAlarmaSorting(); else detenerAlarmaSorting();
+    actualizarAtrasoVisualBloques();
+  }
+
+  function iniciarMonitorAlarmaSorting(){
+    if(monitorAlarmaSortingId) clearInterval(monitorAlarmaSortingId);
+    monitorAlarmaSortingId = setInterval(verificarAlarmaSorting, 20000);
+  }
+
+  /* ============== SORTING: RENDER PRINCIPAL ============== */
+  function renderSorting(){
+    var reg = registroSortingActual();
+    if(!reg) return;
+    actualizarRelojSorting();
+    renderBloques();
+    bindFuerzaLaboral();
+    actualizarMetaSorting();
+    actualizarMensajeSorting();
+    verificarAlarmaSorting();
+  }
+
   /* ============== COLAPSABLES ============== */
   document.querySelectorAll(".collapsible-head").forEach(function(head){
     head.addEventListener("click", function(){
@@ -1558,6 +1982,10 @@
 
   /* ============== RENDER GENERAL ============== */
   function render(){
+    if(rolActual === "sorting"){
+      renderSorting();
+      return;
+    }
     bindCabecera();
     bindInfoLavoro();
     renderHorasGrid();
@@ -1574,11 +2002,14 @@
   window.addEventListener("DOMContentLoaded", function(){
     cargarEstado();
     iniciarMonitorAlarma();
+    iniciarMonitorAlarmaSorting();
+    actualizarRelojSorting();
+    setInterval(actualizarRelojSorting, 1000);
     actualizarDashboardInicio();
     setInterval(actualizarDashboardInicio, 8000);
 
     var sesion = leerSesion(SESSION_KEY);
-    if(sesion === "backus" || sesion === "lavoro"){
+    if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
       mostrarApp(sesion);
     }
   });
