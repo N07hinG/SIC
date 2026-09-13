@@ -562,6 +562,13 @@
   var DATA_KEY = "t2sic_data";
   var HIST_KEY = "t2sic_historico";
 
+  /* ============== BACKEND EN LA NUBE (Google Apps Script + Sheets) ============== */
+  var API_URL = 'https://script.google.com/macros/s/AKfycbyUzvTNymCmtAdZsSDqp5hOZlCucPQ1EFHwwmrHFZKvBKoNnmdiUQkLNJ_CFujtDmCb/exec';
+  var CLAVE_NUBE = 'sic2026';
+  var nubeGuardarTimeoutId = null;
+  var nubeGuardandoAhora = false;
+  var huboEdicionLocalPendiente = false;
+
   var TURNOS_VALIDOS = ["Turno 1 - Ma\u00f1ana","Turno 2 - Tarde","Turno 3 - Nocturno"];
 
   /* ============== ALMACENAMIENTO SEGURO ============== */
@@ -770,9 +777,177 @@
     delete estado.transportesProgramados;
   }
 
-  function guardarEstado(){ try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){} }
+  function guardarEstado(){
+    try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
+    guardarEnNube(estado);
+  }
   function cargarHistorico(){ try{ var raw = leerValor(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
   function guardarHistorico(lista){ try{ guardarValor(HIST_KEY, JSON.stringify(lista)); }catch(e){} }
+
+  /* ============== SINCRONIZACION EN LA NUBE ==============
+     localStorage sigue siendo la copia inmediata y segura (nunca se
+     deja de escribir ahi). Ademas, se manda TODO el estado actual a
+     Google Sheets via el backend de Apps Script, para que cualquier
+     dispositivo pueda leer la misma informacion. Si la red falla, los
+     datos ya quedaron a salvo en localStorage y no se pierde nada. */
+
+  function nombreUsuarioActualParaNube(){
+    if(rolActual === "backus") return estado.nombreBackus || "";
+    if(rolActual === "lavoro") return estado.nombreLavoro || "";
+    if(rolActual === "sorting") return estado.nombreSorting || "";
+    return "";
+  }
+
+  // Guarda con un pequeno "debounce": si el usuario esta escribiendo
+  // rapido (varias teclas seguidas), se agrupan los guardados y solo se
+  // manda UNA peticion a la nube con el estado mas reciente, en vez de
+  // una peticion por cada tecla.
+  function guardarEnNube(datos){
+    if(!rolActual) return; // sin sesion activa no hay nada que sincronizar
+    huboEdicionLocalPendiente = true;
+    if(nubeGuardarTimeoutId) clearTimeout(nubeGuardarTimeoutId);
+    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 1200);
+  }
+
+  async function enviarANube(datos){
+    if(!rolActual){ huboEdicionLocalPendiente = false; return; }
+    nubeGuardandoAhora = true;
+    try{
+      var cuerpo = {
+        clave: CLAVE_NUBE,
+        rol: rolActual,
+        fecha: estado.fecha || "",
+        turno: estado.turno || "",
+        usuario: nombreUsuarioActualParaNube()
+      };
+      // Se copia TODO lo que venga en "datos" (sin filtrar nada), tal
+      // como pide el backend de Apps Script.
+      if(datos && typeof datos === "object"){
+        Object.keys(datos).forEach(function(k){ cuerpo[k] = datos[k]; });
+      }
+      var resp = await fetch(API_URL, {
+        method: "POST",
+        // text/plain evita el preflight CORS que Apps Script no responde.
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(cuerpo)
+      });
+      if(!resp.ok) throw new Error("HTTP " + resp.status);
+      var json = null;
+      try{ json = await resp.json(); }catch(e){ json = null; }
+      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
+    }catch(err){
+      console.error("No se pudo guardar en la nube (se mantiene en localStorage):", err);
+    }finally{
+      nubeGuardandoAhora = false;
+      huboEdicionLocalPendiente = false;
+    }
+  }
+
+  // --- Reconstruccion del estado a partir de las filas planas de Sheets ---
+
+  function parseTimestampNube(ts){
+    var m = String(ts||"").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+    if(!m) return 0;
+    return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6])).getTime();
+  }
+
+  function coaccionarValorNube(v){
+    if(v === "" || v === null || v === undefined) return "";
+    var s = String(v);
+    if(s === "true") return true;
+    if(s === "false") return false;
+    if(/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+    if((s.charAt(0)==="{" && s.charAt(s.length-1)==="}") || (s.charAt(0)==="[" && s.charAt(s.length-1)==="]")){
+      try{ return JSON.parse(s); }catch(e){}
+    }
+    return s;
+  }
+
+  // Convierte "a.b[2].c" en ["a","b",2,"c"] para poder reconstruir el
+  // objeto anidado original a partir de la clave plana guardada en Sheets.
+  function desglosarRutaNube(ruta){
+    var partes = [];
+    String(ruta).split(".").forEach(function(seg){
+      var base = seg.replace(/\[\d+\]/g, "");
+      if(base !== "") partes.push(base);
+      var idxs = seg.match(/\[(\d+)\]/g) || [];
+      idxs.forEach(function(im){ partes.push(Number(im.slice(1,-1))); });
+    });
+    return partes;
+  }
+
+  function asignarEnRutaNube(obj, partes, valor){
+    var actual = obj;
+    for(var i=0; i<partes.length-1; i++){
+      var key = partes[i];
+      var siguienteEsIndice = (typeof partes[i+1] === "number");
+      if(actual[key] === undefined || actual[key] === null || typeof actual[key] !== "object"){
+        actual[key] = siguienteEsIndice ? [] : {};
+      }
+      actual = actual[key];
+    }
+    actual[partes[partes.length-1]] = valor;
+  }
+
+  // Combina las 3 hojas (BACKUS/EXTERNO/SORTING): para cada clave_dato
+  // se queda con la fila mas reciente (por timestamp) sin importar de
+  // que hoja venga, y reconstruye el arbol de datos original.
+  function reconstruirEstadoDesdeNube(dataPorHoja){
+    var porClave = {};
+    ["BACKUS","EXTERNO","SORTING"].forEach(function(hoja){
+      (dataPorHoja[hoja] || []).forEach(function(fila){
+        var clave = fila.clave_dato;
+        if(clave === undefined || clave === null || clave === "") return;
+        var t = parseTimestampNube(fila.timestamp);
+        var actual = porClave[clave];
+        if(!actual || t >= actual.t){
+          porClave[clave] = { valor: fila.valor_dato, t: t };
+        }
+      });
+    });
+
+    var claves = Object.keys(porClave);
+    if(!claves.length) return null;
+
+    var reconstruido = datosPorDefecto();
+    claves.forEach(function(clave){
+      var partes = desglosarRutaNube(clave);
+      if(!partes.length) return;
+      asignarEnRutaNube(reconstruido, partes, coaccionarValorNube(porClave[clave].valor));
+    });
+
+    if(!reconstruido.fecha) reconstruido.fecha = fechaHoyStr();
+    if(!reconstruido.datosPorTurno) reconstruido.datosPorTurno = {};
+    if(!reconstruido.sortingPorTurno) reconstruido.sortingPorTurno = {};
+    if(reconstruido.nombreSorting === undefined) reconstruido.nombreSorting = "";
+    return reconstruido;
+  }
+
+  async function cargarDeNube(){
+    try{
+      var resp = await fetch(API_URL, { method: "GET" });
+      if(!resp.ok) throw new Error("HTTP " + resp.status);
+      var json = await resp.json();
+      if(!json || json.success !== true || !json.data) throw new Error((json && json.error) || "Respuesta invalida del servidor");
+
+      // Si hay una edicion local recien hecha (o en camino de guardarse),
+      // no se pisa con lo que venga de la nube en este ciclo.
+      if(huboEdicionLocalPendiente || nubeGuardandoAhora) return;
+
+      var estadoNube = reconstruirEstadoDesdeNube(json.data);
+      if(!estadoNube) return;
+
+      estado = estadoNube;
+      try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
+
+      if(document.getElementById("vista-app").style.display !== "none"){
+        render();
+      }
+      actualizarDashboardInicio();
+    }catch(err){
+      console.error("No se pudo leer de la nube (se sigue usando localStorage):", err);
+    }
+  }
 
   function toast(msg){
     var t = document.getElementById("toast");
@@ -2012,6 +2187,10 @@
     if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
       mostrarApp(sesion);
     }
+
+    // Sincronizacion con Google Sheets: carga inicial + refresco cada 10s.
+    cargarDeNube();
+    setInterval(cargarDeNube, 10000);
   });
 
 })();
