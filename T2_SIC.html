@@ -2272,5 +2272,153 @@
 
 })();
 </script>
+  /* ===================================================================
+   SIC DIGITAL - FRONTEND (app.js)
+   Backend: Google Apps Script + Google Sheets | Zona: America/Lima
+=================================================================== */
+
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0635f-c9aodxWPHyaUxU03zAXdK9dQQnyNK5_z2pVCDJAPsfuJ6QeksjNAddO0YgW/exec';
+
+let turnoActual = localStorage.getItem('sic_turnoActual') || 'MAÑANA';
+let usuarioActual = localStorage.getItem('sic_usuarioActual') || '';
+
+window.datosBackus = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
+window.datosExterno = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
+window.datosBloques = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
+window.totalesHistoricos = { totales: { armados: 0, cargados: 0, registros: 0 }, porTurno: {} };
+
+let intervaloCargarDatos = null;
+let intervaloCargarTotales = null;
+
+function fechaHoyISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function setTurnoActual(turno) {
+  turnoActual = turno;
+  localStorage.setItem('sic_turnoActual', turno);
+  cargarDatos();
+}
+
+function setUsuarioActual(usuario) {
+  usuarioActual = usuario;
+  localStorage.setItem('sic_usuarioActual', usuario);
+}
+
+function emitirEvento(nombre, detalle) {
+  document.dispatchEvent(new CustomEvent(nombre, { detail: detalle }));
+}
+
+async function obtenerHoja(hoja) {
+  const url = `${SCRIPT_URL}?hoja=${encodeURIComponent(hoja)}&turno=${encodeURIComponent(turnoActual)}&fecha=${encodeURIComponent(fechaHoyISO())}`;
+  try {
+    const resp = await fetch(url, { method: 'GET' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
+    return json.data || { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
+  } catch (err) {
+    console.error(`No se pudo leer ${hoja} desde la nube:`, err);
+    return null;
+  }
+}
+
+async function cargarDatos() {
+  const [backus, externo, bloques] = await Promise.all([
+    obtenerHoja('BACKUS'),
+    obtenerHoja('EXTERNO'),
+    obtenerHoja('BLOQUES')
+  ]);
+
+  if (backus) window.datosBackus = backus;
+  if (externo) window.datosExterno = externo;
+  if (bloques) window.datosBloques = bloques;
+
+  emitirEvento('sic:datosActualizados', {
+    backus: window.datosBackus,
+    externo: window.datosExterno,
+    bloques: window.datosBloques,
+    turno: turnoActual
+  });
+
+  if (typeof renderizarUI === 'function') renderizarUI();
+}
+
+async function cargarTotales() {
+  const url = `${SCRIPT_URL}?tipo=totales`;
+  try {
+    const resp = await fetch(url, { method: 'GET' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
+    window.totalesHistoricos = { totales: json.totales, porTurno: json.porTurno };
+    emitirEvento('sic:totalesActualizados', window.totalesHistoricos);
+    if (typeof renderizarTotales === 'function') renderizarTotales();
+  } catch (err) {
+    console.error('No se pudo leer el historico de totales:', err);
+  }
+}
+
+async function enviarCambio(hoja, tipoCambio) {
+  const cuerpo = Object.assign({
+    tipo: 'actualizacion',
+    hoja: hoja,
+    turno: turnoActual,
+    usuario: usuarioActual,
+    supervisor: usuarioActual
+  }, tipoCambio);
+
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(cuerpo)
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
+    return json;
+  } catch (err) {
+    console.error(`No se pudo guardar el cambio en ${hoja}:`, err);
+    return null;
+  }
+}
+
+async function hacerReset() {
+  if (usuarioActual !== 'BACKUS') {
+    alert('Solo el usuario BACKUS puede finalizar un turno.');
+    return;
+  }
+  const confirmado = confirm(`¿Finalizar turno ${turnoActual}?`);
+  if (!confirmado) return;
+
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ tipo: 'reset', turno: turnoActual, usuario: usuarioActual })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
+    await cargarDatos();
+    emitirEvento('sic:turnoFinalizado', { turno: turnoActual });
+  } catch (err) {
+    console.error('No se pudo finalizar el turno:', err);
+    alert('No se pudo finalizar el turno. Revisa tu conexion e intenta de nuevo.');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  cargarDatos();
+  cargarTotales();
+  intervaloCargarDatos = setInterval(cargarDatos, 10000);
+  intervaloCargarTotales = setInterval(cargarTotales, 60000);
+});
+</script>  
 </body>
 </html>
