@@ -553,6 +553,10 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- ============== FIREBASE (sincronizacion en tiempo real entre dispositivos) ============== -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
 <script>
 (function(){
   "use strict";
@@ -562,9 +566,25 @@
   var DATA_KEY = "t2sic_data";
   var HIST_KEY = "t2sic_historico";
 
-  /* ============== BACKEND EN LA NUBE (Google Apps Script + Sheets) ============== */
-  var API_URL = 'https://script.google.com/macros/s/AKfycbynReWRjGjUrNzfI_5jh7VlolCrkMyrPO3ebCpl58gQo5tEU12_jj6eL6XWVWmsu3Qt/exec';
-  var CLAVE_NUBE = 'sic2026';
+  /* ============== BACKEND EN LA NUBE (Firebase Realtime Database) ============== */
+  var firebaseConfig = {
+    apiKey: "AIzaSyDg4sjcQgRWKjHXXGnvPgpaqfJa52IpYQA",
+    authDomain: "sic-digital-543a6.firebaseapp.com",
+    databaseURL: "https://sic-digital-543a6-default-rtdb.firebaseio.com/",
+    projectId: "sic-digital-543a6",
+    storageBucket: "sic-digital-543a6.firebasestorage.app",
+    messagingSenderId: "991908552863",
+    appId: "1:991908552863:web:baa166d5bd1be1767242aa"
+  };
+  var firebaseApp = null;
+  var dbEstadoRef = null;
+  try{
+    firebaseApp = firebase.initializeApp(firebaseConfig);
+    dbEstadoRef = firebase.database().ref("estadoApp");
+  }catch(e){
+    console.error("No se pudo inicializar Firebase (se sigue usando localStorage):", e);
+  }
+
   var nubeGuardarTimeoutId = null;
   var nubeGuardandoAhora = false;
   var huboEdicionLocalPendiente = false;
@@ -784,12 +804,13 @@
   function cargarHistorico(){ try{ var raw = leerValor(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
   function guardarHistorico(lista){ try{ guardarValor(HIST_KEY, JSON.stringify(lista)); }catch(e){} }
 
-  /* ============== SINCRONIZACION EN LA NUBE ==============
+  /* ============== SINCRONIZACION EN LA NUBE (Firebase Realtime Database) ==============
      localStorage sigue siendo la copia inmediata y segura (nunca se
      deja de escribir ahi). Ademas, se manda TODO el estado actual a
-     Google Sheets via el backend de Apps Script, para que cualquier
-     dispositivo pueda leer la misma informacion. Si la red falla, los
-     datos ya quedaron a salvo en localStorage y no se pierde nada. */
+     Firebase, para que cualquier dispositivo pueda leer la misma
+     informacion al instante (sin necesidad de refrescar la pagina).
+     Si la red falla, los datos ya quedaron a salvo en localStorage y
+     no se pierde nada. */
 
   function nombreUsuarioActualParaNube(){
     if(rolActual === "backus") return estado.nombreBackus || "";
@@ -800,189 +821,84 @@
 
   // Guarda con un pequeno "debounce": si el usuario esta escribiendo
   // rapido (varias teclas seguidas), se agrupan los guardados y solo se
-  // manda UNA peticion a la nube con el estado mas reciente, en vez de
-  // una peticion por cada tecla.
+  // manda UNA escritura a Firebase con el estado mas reciente, en vez de
+  // una escritura por cada tecla.
   function guardarEnNube(datos){
-    if(!rolActual) return; // sin sesion activa no hay nada que sincronizar
+    if(!rolActual || !dbEstadoRef) return; // sin sesion activa o sin Firebase, no hay nada que sincronizar
     huboEdicionLocalPendiente = true;
     if(nubeGuardarTimeoutId) clearTimeout(nubeGuardarTimeoutId);
-    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 1200);
+    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 800);
   }
 
-  async function enviarANube(datos){
-    if(!rolActual){ huboEdicionLocalPendiente = false; return; }
+  function enviarANube(datos){
+    if(!rolActual || !dbEstadoRef){ huboEdicionLocalPendiente = false; return; }
     nubeGuardandoAhora = true;
-    try{
-      var cuerpo = {
-        clave: CLAVE_NUBE,
-        tipo: "en_vivo", // sincronizacion en tiempo real -> siempre va a la hoja EN_VIVO
-        rol: rolActual,
-        fecha: estado.fecha || "",
-        turno: estado.turno || "",
-        usuario: nombreUsuarioActualParaNube()
-      };
-      // Se copia TODO lo que venga en "datos" (sin filtrar nada), tal
-      // como pide el backend de Apps Script.
-      if(datos && typeof datos === "object"){
-        Object.keys(datos).forEach(function(k){ cuerpo[k] = datos[k]; });
-      }
-      var resp = await fetch(API_URL, {
-        method: "POST",
-        // text/plain evita el preflight CORS que Apps Script no responde.
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(cuerpo)
-      });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = null;
-      try{ json = await resp.json(); }catch(e){ json = null; }
-      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
-    }catch(err){
-      console.error("No se pudo guardar en la nube (se mantiene en localStorage):", err);
-    }finally{
+    dbEstadoRef.set(datos).then(function(){
       nubeGuardandoAhora = false;
       huboEdicionLocalPendiente = false;
-    }
-  }
-
-  // --- Reconstruccion del estado a partir de las filas planas de Sheets ---
-
-  function parseTimestampNube(ts){
-    var m = String(ts||"").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
-    if(!m) return 0;
-    return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6])).getTime();
-  }
-
-  function coaccionarValorNube(v){
-    if(v === "" || v === null || v === undefined) return "";
-    var s = String(v);
-    if(s === "true") return true;
-    if(s === "false") return false;
-    if(/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
-    if((s.charAt(0)==="{" && s.charAt(s.length-1)==="}") || (s.charAt(0)==="[" && s.charAt(s.length-1)==="]")){
-      try{ return JSON.parse(s); }catch(e){}
-    }
-    return s;
-  }
-
-  // Convierte "a.b[2].c" en ["a","b",2,"c"] para poder reconstruir el
-  // objeto anidado original a partir de la clave plana guardada en Sheets.
-  function desglosarRutaNube(ruta){
-    var partes = [];
-    String(ruta).split(".").forEach(function(seg){
-      var base = seg.replace(/\[\d+\]/g, "");
-      if(base !== "") partes.push(base);
-      var idxs = seg.match(/\[(\d+)\]/g) || [];
-      idxs.forEach(function(im){ partes.push(Number(im.slice(1,-1))); });
+    }).catch(function(err){
+      console.error("No se pudo guardar en Firebase (se mantiene en localStorage):", err);
+      nubeGuardandoAhora = false;
+      huboEdicionLocalPendiente = false;
     });
-    return partes;
   }
 
-  function asignarEnRutaNube(obj, partes, valor){
-    var actual = obj;
-    for(var i=0; i<partes.length-1; i++){
-      var key = partes[i];
-      var siguienteEsIndice = (typeof partes[i+1] === "number");
-      if(actual[key] === undefined || actual[key] === null || typeof actual[key] !== "object"){
-        actual[key] = siguienteEsIndice ? [] : {};
-      }
-      actual = actual[key];
-    }
-    actual[partes[partes.length-1]] = valor;
-  }
-
-  // Combina las 3 hojas (BACKUS/EXTERNO/SORTING): para cada clave_dato
-  // se queda con la fila mas reciente (por timestamp) sin importar de
-  // que hoja venga, y reconstruye el arbol de datos original.
-  function reconstruirEstadoDesdeNube(dataPorHoja){
-    var porClave = {};
-    // La sincronizacion en tiempo real vive UNICAMENTE en la hoja EN_VIVO.
-    // BACKUS/EXTERNO/SORTING ya no se usan para esto: esas 3 hojas ahora
-    // solo guardan 1 fila de reporte por status enviado a WhatsApp.
-    (dataPorHoja["EN_VIVO"] || []).forEach(function(fila){
-      var clave = fila.clave_dato;
-      if(clave === undefined || clave === null || clave === "") return;
-      var t = parseTimestampNube(fila.timestamp);
-      var actual = porClave[clave];
-      if(!actual || t >= actual.t){
-        porClave[clave] = { valor: fila.valor_dato, t: t };
-      }
-    });
-
-    var claves = Object.keys(porClave);
-    if(!claves.length) return null;
-
-    var reconstruido = datosPorDefecto();
-    claves.forEach(function(clave){
-      var partes = desglosarRutaNube(clave);
-      if(!partes.length) return;
-      asignarEnRutaNube(reconstruido, partes, coaccionarValorNube(porClave[clave].valor));
-    });
-
-    if(!reconstruido.fecha) reconstruido.fecha = fechaHoyStr();
-    if(!reconstruido.datosPorTurno) reconstruido.datosPorTurno = {};
-    if(!reconstruido.sortingPorTurno) reconstruido.sortingPorTurno = {};
-    if(reconstruido.nombreSorting === undefined) reconstruido.nombreSorting = "";
-    return reconstruido;
-  }
-
-  /* ============== REPORTE DE STATUS (1 fila por click en "Enviar por WhatsApp") ==============
-     Esto es independiente de la sincronizacion en tiempo real (EN_VIVO).
-     Guarda SOLO 1 fila en la hoja BACKUS/EXTERNO/SORTING segun el rol
-     activo. Si ya existe esa fecha+turno+hora_reporte, el backend la
-     actualiza en vez de duplicarla. */
-  async function enviarReporteStatus(camposReporte, mensajeExacto){
-    if(!rolActual) return;
+  /* ============== REPORTE DE STATUS (1 registro por click en "Enviar por WhatsApp") ==============
+     Independiente de la sincronizacion en tiempo real de "estadoApp".
+     Guarda 1 registro bajo reportes/{ROL}/{clave} en Firebase. Si ya
+     existe esa fecha+turno+hora_reporte, se sobreescribe en vez de
+     duplicarse. */
+  function enviarReporteStatus(camposReporte, mensajeExacto){
+    if(!rolActual || !firebaseApp) return;
     try{
-      var cuerpo = {
-        clave: CLAVE_NUBE,
-        tipo: "reporte",
-        rol: rolActual,
+      var nombreNodo = rolActual === "backus" ? "BACKUS" : (rolActual === "sorting" ? "SORTING" : "EXTERNO");
+      var registro = {
         fecha: estado.fecha || "",
         turno: estado.turno || "",
         usuario: nombreUsuarioActualParaNube(),
-        comentario_status: mensajeExacto || ""
+        comentario_status: mensajeExacto || "",
+        timestamp: Date.now()
       };
       if(camposReporte && typeof camposReporte === "object"){
-        Object.keys(camposReporte).forEach(function(k){ cuerpo[k] = camposReporte[k]; });
+        Object.keys(camposReporte).forEach(function(k){ registro[k] = camposReporte[k]; });
       }
-      var resp = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(cuerpo)
+      var claveFila = (estado.fecha||"x") + "_" + (estado.turno||"x") + "_" + (registro.hora_reporte||"sinhora");
+      claveFila = claveFila.replace(/[.#$\[\]\/\s]/g, "-");
+      firebase.database().ref("reportes/" + nombreNodo + "/" + claveFila).set(registro).catch(function(err){
+        console.error("No se pudo enviar el reporte de status a Firebase:", err);
       });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = null;
-      try{ json = await resp.json(); }catch(e){ json = null; }
-      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
     }catch(err){
-      console.error("No se pudo enviar el reporte de status a la nube:", err);
+      console.error("No se pudo enviar el reporte de status a Firebase:", err);
     }
   }
 
-  async function cargarDeNube(){
-    try{
-      var resp = await fetch(API_URL, { method: "GET" });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = await resp.json();
-      if(!json || json.success !== true || !json.data) throw new Error((json && json.error) || "Respuesta invalida del servidor");
-
-      // Si hay una edicion local recien hecha (o en camino de guardarse),
-      // no se pisa con lo que venga de la nube en este ciclo.
+  // Escucha en tiempo real: cada vez que CUALQUIER dispositivo escribe en
+  // Firebase, todos los demas reciben el cambio al instante (sin esperar
+  // a un refresco por tiempo). Si el propio dispositivo acaba de
+  // escribir (o esta a punto de hacerlo), se ignora ese eco para no
+  // pisar lo que el usuario esta escribiendo en ese momento.
+  function iniciarEscuchaNube(){
+    if(!dbEstadoRef) return;
+    dbEstadoRef.on("value", function(snapshot){
       if(huboEdicionLocalPendiente || nubeGuardandoAhora) return;
+      var val = snapshot.val();
+      if(!val) return;
 
-      var estadoNube = reconstruirEstadoDesdeNube(json.data);
-      if(!estadoNube) return;
+      estado = val;
+      if(!estado.fecha) estado.fecha = fechaHoyStr();
+      if(!estado.datosPorTurno) estado.datosPorTurno = {};
+      if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
+      if(estado.nombreSorting === undefined) estado.nombreSorting = "";
 
-      estado = estadoNube;
       try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
 
       if(document.getElementById("vista-app").style.display !== "none"){
         render();
       }
       actualizarDashboardInicio();
-    }catch(err){
-      console.error("No se pudo leer de la nube (se sigue usando localStorage):", err);
-    }
+    }, function(err){
+      console.error("No se pudo escuchar cambios en Firebase (se sigue usando localStorage):", err);
+    });
   }
 
   function toast(msg){
@@ -2258,16 +2174,16 @@
     actualizarRelojSorting();
     setInterval(actualizarRelojSorting, 1000);
     actualizarDashboardInicio();
-    setInterval(actualizarDashboardInicio, 8000);
 
     var sesion = leerSesion(SESSION_KEY);
     if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
       mostrarApp(sesion);
     }
 
-    // Sincronizacion con Google Sheets: carga inicial + refresco cada 10s.
-    cargarDeNube();
-    setInterval(cargarDeNube, 10000);
+    // Sincronizacion en tiempo real con Firebase: se conecta una sola
+    // vez y desde ahi recibe cada cambio al instante (no hace falta
+    // refrescar la pagina ni encuestar cada cierto tiempo).
+    iniciarEscuchaNube();
   });
 
 })();
