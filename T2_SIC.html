@@ -2,2423 +2,306 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SIC DIGITAL</title>
-<meta name="theme-color" content="#0f1216">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1216;
-    --panel:#171c22;
-    --panel-2:#1f262d;
-    --border:#2a323a;
-    --amber:#f2a900;
-    --rojo:#e5484d;
-    --verde:#33d689;
-    --azul:#4aa8ff;
-    --text:#eef1f3;
-    --text-soft:#8d99a3;
-    --radius:10px;
+    --bg:#0f1216; --panel:#171c22; --panel-2:#1f262d; --border:#2a323a;
+    --amber:#f2a900; --rojo:#e5484d; --verde:#33d689; --azul:#4aa8ff;
+    --text:#eef1f3; --text-soft:#8d99a3;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;}
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    font-family:'Inter',sans-serif;
-    -webkit-font-smoothing:antialiased;
-    overscroll-behavior-y:none;
-  }
-  input,select,textarea,button{font-family:inherit;}
-  .brand{font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:0.5px;}
-  .num{font-family:'Roboto Mono',monospace;}
-
-  /* ---------- PANTALLA INICIAL / LOGIN ---------- */
-  #vista-login{
-    min-height:100vh;min-height:100dvh;
-    display:flex;flex-direction:column;align-items:center;
-    padding:26px 16px 40px;
-    background:radial-gradient(ellipse at 50% -10%, rgba(242,169,0,0.10), transparent 55%), var(--bg);
-  }
-  .login-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .login-strip{height:5px;background:linear-gradient(90deg,var(--rojo) 0 33%, var(--amber) 33% 66%, var(--verde) 66% 100%);}
-  .login-body{padding:26px 24px 22px;}
-  .login-brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px;}
-  .login-brand .t2{font-size:36px;line-height:1;color:var(--amber);}
-  .login-brand .sic{font-size:36px;line-height:1;color:var(--text);}
-  .login-topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-  .user-menu-wrap{position:relative;flex:none;margin-top:4px;}
-  .user-menu{
-    display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:160px;z-index:30;
-    background:var(--panel-2);border:1px solid var(--border);border-radius:9px;overflow:hidden;
-    box-shadow:0 10px 28px rgba(0,0,0,.45);
-  }
-  .user-menu.open{display:block;}
-  .user-menu-item{padding:12px 14px;font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);}
-  .user-menu-item:last-child{border-bottom:none;}
-  .user-menu-item:active{background:var(--panel);}
-  .login-sub{color:var(--text-soft);font-size:13px;margin:2px 0 20px;}
-  .login-sep{height:1px;background:var(--border);margin:20px 0;}
-  .login-seccion-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--text-soft);letter-spacing:.4px;margin:0 0 10px;text-transform:uppercase;}
-
-  .campo{margin-bottom:16px;}
-  .campo label{display:block;font-size:12px;color:var(--text-soft);margin-bottom:6px;}
-  .campo input, .campo select{
-    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
-    border-radius:8px;padding:13px 14px;font-size:15px;outline:none;transition:border-color .15s;
-    appearance:none;-webkit-appearance:none;
-  }
-  .campo select{
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d99a3' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
-    background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:38px;
-  }
-  .campo input:focus,.campo select:focus{border-color:var(--amber);}
-
-  /* Dashboard publico (pantalla inicial) */
-  .dash-canvas-wrap{position:relative;height:150px;margin-bottom:10px;}
-  .dash-totales{display:flex;gap:10px;margin-bottom:4px;}
-  .dash-caja{
-    flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;
-  }
-  .dash-caja label{display:block;font-size:9.5px;color:var(--text-soft);letter-spacing:.4px;margin-bottom:5px;}
-  .dash-caja .valor{font-family:'Roboto Mono',monospace;font-weight:700;font-size:15px;color:var(--text);}
-  .dash-caja .pct{font-family:'Roboto Mono',monospace;font-weight:700;font-size:19px;margin-top:2px;}
-  .dash-caja.armado .pct{color:var(--azul);}
-  .dash-caja.cargado .pct{color:var(--amber);}
-
-  /* Filtro de turno en la pantalla inicial */
-  .filtro-inicio{display:flex;gap:6px;margin-bottom:12px;}
-  .filtro-btn{
-    flex:1;text-align:center;padding:8px 4px;border-radius:8px;border:1px solid var(--border);
-    background:var(--panel-2);color:var(--text-soft);font-size:10.5px;font-weight:700;cursor:pointer;
-    font-family:'Roboto Mono',monospace;letter-spacing:.2px;
-  }
-  .filtro-btn.activo{background:rgba(242,169,0,0.14);border-color:var(--amber);color:var(--amber);}
-  .filtro-inicio-label{text-align:center;font-size:10.5px;color:var(--text-soft);margin:-4px 0 10px;letter-spacing:.3px;}
-
-  /* Plan de Accion (alarma de cumplimiento) - reutilizable en varias vistas */
-  .plan-accion-display{
-    cursor:pointer;color:var(--azul);font-weight:600;text-align:center;font-family:'Roboto Mono',monospace;font-size:12px;
-    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
-  }
-  input.plan-accion-display{padding:9px 10px;font-size:13.5px;width:100%;}
-  div.plan-accion-display{padding:12px 10px;font-size:13px;margin-bottom:16px;}
-  .plan-accion-display.alerta{
-    color:#fff;border-color:var(--rojo);font-weight:700;animation:pulso-alerta 1s infinite;
-  }
-  @keyframes pulso-alerta{
-    0%,100%{background:var(--panel-2);}
-    50%{background:rgba(229,72,77,0.55);}
-  }
-
-  .subform{display:none;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:16px;margin:14px 0 14px;}
-  .subform.open{display:block;}
-  .subform .campo{margin-bottom:12px;}
-  .subform .campo:last-of-type{margin-bottom:14px;}
-  .subform-btn{
-    width:100%;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;
-  }
-  .subform-btn.backus{background:var(--amber);color:#1a1300;}
-  .subform-btn.lavoro{background:var(--azul);color:#04182c;}
-
-  .login-error{color:var(--rojo);font-size:13px;margin-top:10px;min-height:16px;text-align:center;}
-  .login-footer{text-align:center;color:var(--text-soft);font-size:11.5px;padding:16px 10px 20px;border-top:1px solid var(--border);letter-spacing:.2px;}
-
-  /* ---------- APP SHELL ---------- */
-  #vista-app{display:none;min-height:100vh;min-height:100dvh;padding-bottom:40px;}
-  .topbar{
-    position:sticky;top:0;z-index:20;background:rgba(15,18,22,0.92);backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
-  }
-  .topbar .brand{font-size:22px;}
-  .topbar .brand .t2{color:var(--amber);}
-  .topbar-actions{display:flex;gap:8px;align-items:center;}
-  .icon-btn{
-    background:var(--panel-2);border:1px solid var(--border);color:var(--text-soft);width:34px;height:34px;
-    border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;
-  }
-  .icon-btn:active{background:var(--panel);}
-  main{padding:14px 14px 0;max-width:640px;margin:0 auto;}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
-  .panel.compact{padding:12px;}
-  .panel-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;letter-spacing:.3px;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;}
-  .panel-title.small{font-size:15px;margin-bottom:8px;}
-  .panel-title .tag{font-size:10.5px;color:var(--text-soft);font-family:'Inter',sans-serif;font-weight:600;background:var(--panel-2);border:1px solid var(--border);padding:3px 8px;border-radius:20px;}
-
-  /* Header AB InBev */
-  .marca-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;}
-  .marca-ab{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--text-soft);letter-spacing:.3px;}
-  .marca-sic{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:19px;color:var(--text);letter-spacing:.3px;text-align:right;}
-  .marca-sic .accent{color:var(--amber);}
-
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .campo-mini label{display:block;font-size:11px;color:var(--text-soft);margin-bottom:5px;}
-  .campo-mini input,.campo-mini textarea{
-    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
-    padding:9px 10px;font-size:13.5px;outline:none;
-  }
-  .campo-mini input:focus,.campo-mini textarea:focus{border-color:var(--amber);}
-  .campo-mini.full{grid-column:1 / -1;}
-
-  /* Info simple para Lavoro (turno/fecha de solo lectura) */
-  .info-lavoro{display:flex;gap:10px;margin-bottom:14px;}
-  .info-lavoro .caja{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
-  .info-lavoro .caja label{display:block;font-size:9.5px;color:var(--text-soft);letter-spacing:.4px;margin-bottom:4px;}
-  .info-lavoro .caja span{font-family:'Roboto Mono',monospace;font-weight:600;font-size:13px;}
-
-  /* Transportes programados + estatus */
-  .fila-transp{display:flex;gap:10px;margin-top:14px;}
-  .caja-transp{
-    flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
-    padding:12px 10px;text-align:center;
-  }
-  .caja-transp label{display:block;font-size:10px;color:var(--text-soft);letter-spacing:.4px;margin-bottom:6px;}
-  .caja-transp input{
-    width:100%;background:transparent;border:none;color:var(--amber);text-align:center;
-    font-family:'Roboto Mono',monospace;font-weight:700;font-size:26px;outline:none;
-    cursor:default;
-  }
-  .caja-transp label span{display:block;font-size:9px;color:var(--text-soft);letter-spacing:.2px;margin-top:2px;font-weight:400;}
-  .caja-estatus{
-    flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
-    padding:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-    cursor:pointer;
-  }
-  .caja-estatus:active{background:var(--panel);}
-  .led{width:16px;height:16px;border-radius:50%;background:var(--azul);box-shadow:0 0 12px 3px rgba(74,168,255,0.7);}
-  .caja-estatus span{font-size:10px;color:var(--text-soft);letter-spacing:.4px;text-align:center;}
-
-  /* Estatus de carga - mensaje */
-  #panel-mensaje{display:none;}
-  #panel-mensaje.open{display:block;}
-  #panel-mensaje-armado{display:none;}
-  #panel-mensaje-armado.open{display:block;}
-  .mensaje-caja{
-    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;
-    font-family:'Roboto Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;color:var(--text);
-    margin-bottom:10px;
-  }
-  .btn-row{display:flex;gap:10px;margin-top:4px;}
-  .btn-row .btn{width:auto;flex:1;}
-
-  .chart-wrap{position:relative;height:250px;}
-  .estado-fila{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
-  .dot{width:10px;height:10px;border-radius:50%;}
-  .estado-txt{font-size:12.5px;color:var(--text-soft);}
-  .estado-pct{margin-left:auto;font-size:22px;}
-
-  /* Selector de horas */
-  .horas-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
-  .hora-btn{
-    background:var(--panel-2);border:1px solid var(--border);color:var(--text-soft);
-    border-radius:8px;padding:10px 4px;text-align:center;font-family:'Roboto Mono',monospace;font-size:12.5px;
-    font-weight:600;cursor:pointer;
-  }
-  .hora-btn.activa{background:rgba(242,169,0,0.14);border-color:var(--amber);color:var(--amber);}
-  .hora-btn .chk{display:block;font-size:9px;color:var(--verde);margin-top:2px;letter-spacing:.3px;}
-  .hora-btn.activa .chk{color:var(--amber);}
-
-  .campo-dato{margin-bottom:10px;}
-  .campo-dato label{display:block;font-size:12px;color:var(--text-soft);margin-bottom:6px;}
-  .campo-dato input{
-    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;
-    padding:12px 14px;font-size:16px;outline:none;font-family:'Roboto Mono',monospace;font-weight:600;
-  }
-  .campo-dato input:focus{border-color:var(--amber);}
-  .campo-dato input:disabled{opacity:.4;cursor:not-allowed;color:var(--text-soft);}
-
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;border:1px solid var(--border);
-    background:var(--panel-2);color:var(--text);padding:11px 16px;font-size:13.5px;font-weight:600;cursor:pointer;width:100%;
-  }
-  .btn:active{background:var(--panel);}
-  .btn-amber{background:var(--amber);color:#1a1300;border:none;}
-  .btn-amber:active{background:#d99400;}
-  .btn-ghost{background:transparent;}
-
-  /* Planes de reaccion (compacto) */
-  .plan-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;}
-  .plan-num{
-    font-family:'Roboto Mono',monospace;color:var(--amber);background:var(--panel-2);border:1px solid var(--border);
-    width:22px;height:22px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;
-    font-size:11px;margin-top:1px;
-  }
-  .plan-row input{
-    flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;
-    padding:6px 8px;font-size:12px;outline:none;
-  }
-  .plan-row input:focus{border-color:var(--amber);}
-
-  /* ---------- SECCION BLOQUES (solo Sorting) ---------- */
-  .sorting-reloj{
-    font-family:'Roboto Mono',monospace;font-weight:700;font-size:19px;text-align:center;
-    color:var(--amber);background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:12px 10px;
-  }
-  .bloque-item{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--border);}
-  .bloque-item:last-child{border-bottom:none;}
-  .bloque-item.atrasado{background:rgba(229,72,77,0.14);border-radius:8px;padding:11px 8px;margin:0 -8px;}
-  .bloque-check{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0;}
-  .bloque-check input[type="checkbox"]{width:19px;height:19px;flex:none;accent-color:var(--amber);cursor:pointer;}
-  .bloque-nombre{font-size:13.5px;color:var(--text);line-height:1.35;}
-  .bloque-item.atrasado .bloque-nombre{color:var(--rojo);font-weight:700;}
-  .bloque-nombre small{display:block;color:var(--text-soft);font-size:10.5px;font-weight:400;margin-top:2px;}
-  .bloque-item.atrasado .bloque-nombre small{color:var(--rojo);opacity:.85;}
-  .bloque-cajas{
-    width:96px;flex:none;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
-    padding:9px 6px;font-size:13px;text-align:center;outline:none;font-family:'Roboto Mono',monospace;font-weight:600;
-  }
-  .bloque-cajas:focus{border-color:var(--amber);}
-  .bloque-cajas:disabled{opacity:.35;cursor:not-allowed;}
-  .sorting-meta-barra-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:20px;height:16px;overflow:hidden;margin-top:2px;}
-  .sorting-meta-barra{height:100%;width:0%;background:var(--amber);transition:width .3s ease, background .3s ease;}
-  .sorting-meta-barra.completa{background:var(--verde);}
-  .sorting-total-personal{
-    margin-top:12px;font-family:'Roboto Mono',monospace;font-weight:700;font-size:13.5px;text-align:center;
-    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);
-  }
-  .sorting-check-row{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13.5px;color:var(--text);cursor:pointer;}
-  .sorting-check-row input[type="checkbox"]{width:19px;height:19px;accent-color:var(--amber);cursor:pointer;}
-  #panel-mensaje-sorting{display:none;}
-  #panel-mensaje-sorting.open{display:block;}
-
-  .collapsible-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
-  .chev{color:var(--text-soft);transition:transform .2s;font-size:13px;}
-  .chev.open{transform:rotate(180deg);}
-  .collapsible-body{display:none;margin-top:12px;}
-  .collapsible-body.open{display:block;}
-
-  .hist-item{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;}
-  .hist-item:last-child{border-bottom:none;}
-  .hist-fecha{font-family:'Roboto Mono',monospace;font-size:12px;color:var(--text);width:96px;flex:none;line-height:1.4;}
-  .hist-info{flex:1;font-size:11.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .hist-pct{font-family:'Roboto Mono',monospace;font-weight:700;font-size:14px;}
-  .hist-empty{color:var(--text-soft);font-size:13px;text-align:center;padding:14px 0;}
-
-  .toast{
-    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
-    background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:11px 18px;border-radius:30px;
-    font-size:13px;opacity:0;pointer-events:none;transition:all .25s;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.4);
-  }
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-  footer.app-footer{text-align:center;color:var(--text-soft);font-size:11px;padding:18px 10px 6px;}
-
-  @media (min-width:640px){
-    .horas-grid{grid-template-columns:repeat(8,1fr);}
-  }
-
-  /* ---------- PERMISOS POR ROL ---------- */
-  body.rol-lavoro .solo-backus, body.rol-lavoro .solo-sorting{display:none !important;}
-  body.rol-backus .solo-lavoro, body.rol-backus .solo-sorting{display:none !important;}
-  body.rol-sorting .solo-backus, body.rol-sorting .solo-lavoro{display:none !important;}
-  body.rol-sorting .oculto-sorting{display:none !important;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;padding-bottom:40px;}
+  header{position:sticky;top:0;background:rgba(15,18,22,.95);border-bottom:1px solid var(--border);padding:14px 16px;text-align:center;z-index:10;}
+  header h1{margin:0;font-size:20px;letter-spacing:.5px;}
+  header h1 span{color:var(--amber);}
+  main{max-width:640px;margin:0 auto;padding:14px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
+  .panel h2{margin:0 0 12px;font-size:16px;}
+  .panel h2 .estado-badge{float:right;font-size:11px;background:var(--panel-2);border:1px solid var(--border);padding:3px 8px;border-radius:20px;color:var(--text-soft);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  label{display:block;font-size:12px;color:var(--text-soft);margin-bottom:5px;}
+  input,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:10px;font-size:14px;outline:none;}
+  input:focus,select:focus{border-color:var(--amber);}
+  .valores{display:flex;gap:10px;margin:12px 0;}
+  .valor-caja{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
+  .valor-caja label{margin-bottom:4px;}
+  .valor-caja span{font-family:monospace;font-weight:700;font-size:20px;}
+  .btn{border:none;border-radius:8px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;}
+  .btn-armado{background:var(--azul);color:#04182c;}
+  .btn-cargado{background:var(--amber);color:#1a1300;}
+  .btn-row{display:flex;gap:10px;margin-top:6px;}
+  .btn-reset{background:var(--rojo);color:#fff;margin-top:6px;display:none;}
+  .meta-fila{display:flex;gap:8px;margin-top:10px;}
+  .meta-fila input{flex:1;}
+  .totales-fila{display:flex;gap:10px;text-align:center;margin-top:8px;}
+  .totales-fila .caja{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px;}
+  .totales-fila .caja label{font-size:10px;}
+  .totales-fila .caja span{font-family:monospace;font-weight:700;}
+  small.info{color:var(--text-soft);font-size:11px;display:block;margin-top:4px;}
 </style>
 </head>
 <body>
 
-<!-- ================= PANTALLA INICIAL (login + dashboard publico) ================= -->
-<div id="vista-login">
-  <div class="login-card">
-    <div class="login-strip"></div>
-    <div class="login-body">
-      <div class="login-topbar">
-        <div class="login-brand"><span class="brand t2">SIC</span><span class="brand sic">DIGITAL</span></div>
-        <div class="user-menu-wrap">
-          <button class="icon-btn" id="btn-user-menu" type="button" title="Ingresar" aria-haspopup="true" aria-expanded="false">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </button>
-          <div class="user-menu" id="user-menu">
-            <div class="user-menu-item" id="opt-abinbev" data-rol="backus">ABInBev</div>
-            <div class="user-menu-item" id="opt-externo" data-rol="lavoro">Externo</div>
-            <div class="user-menu-item" id="opt-sorting" data-rol="sorting">Sorting</div>
-          </div>
-        </div>
-      </div>
-      <p class="login-sub">SIC Digital VPO &mdash; panel de turno</p>
+<header>
+  <h1><span>SIC</span> DIGITAL</h1>
+</header>
 
-      <!-- Filtro de turno para el dashboard publico -->
-      <div class="filtro-inicio" id="filtro-inicio">
-        <div class="filtro-btn" data-filtro="todos">TODOS</div>
-        <div class="filtro-btn" data-filtro="Turno 1 - Ma&ntilde;ana">Ma&ntilde;ana</div>
-        <div class="filtro-btn" data-filtro="Turno 2 - Tarde">Tarde</div>
-        <div class="filtro-btn" data-filtro="Turno 3 - Nocturno">Noche</div>
-      </div>
-      <div class="filtro-inicio-label" id="filtro-inicio-label">Mostrando: Total del d&iacute;a</div>
+<main>
 
-      <!-- Dashboard en vivo, visible sin necesidad de iniciar sesion -->
-      <div class="dash-canvas-wrap"><canvas id="grafico-inicio"></canvas></div>
-      <div class="dash-totales">
-        <div class="dash-caja armado">
-          <label>TOTAL ARMADOS</label>
-          <div class="valor" id="ini-total-armado">0 / 0</div>
-          <div class="pct" id="ini-pct-armado">0%</div>
-        </div>
-        <div class="dash-caja cargado">
-          <label>TOTAL CARGADOS</label>
-          <div class="valor" id="ini-total-cargado">0 / 0</div>
-          <div class="pct" id="ini-pct-cargado">0%</div>
-        </div>
+  <!-- ===================== CONFIGURACION DE SESION ===================== -->
+  <section class="panel">
+    <h2>Sesión</h2>
+    <div class="grid2">
+      <div>
+        <label for="sel-turno">Turno</label>
+        <select id="sel-turno">
+          <option value="MAÑANA">Mañana</option>
+          <option value="TARDE">Tarde</option>
+          <option value="NOCHE">Noche</option>
+        </select>
       </div>
-      <div class="plan-accion-display" id="alerta-inicio" title="Toca para silenciar la alarma">-</div>
-
-      <!-- Formulario de ingreso unificado (se muestra tras elegir ABInBev o Externo) -->
-      <div class="subform" id="form-login">
-        <p class="login-seccion-titulo" id="form-login-titulo">Ingresar</p>
-        <div class="campo">
-          <label for="in-turno-login">Selecciona tu Turno</label>
-          <select id="in-turno-login">
-            <option value="" selected disabled>Selecciona un turno</option>
-            <option value="Turno 1 - Ma&ntilde;ana">Ma&ntilde;ana</option>
-            <option value="Turno 2 - Tarde">Tarde</option>
-            <option value="Turno 3 - Nocturno">Noche</option>
-          </select>
-        </div>
-        <div class="campo">
-          <label for="in-nombre-login">Ingresa tus Nombres Completos</label>
-          <input id="in-nombre-login" type="text" placeholder="Nombre y Apellido" autocomplete="off">
-        </div>
-        <div class="campo" id="campo-pass-login" style="display:none;">
-          <label for="in-pass-login">Contrase&ntilde;a</label>
-          <input id="in-pass-login" type="password" placeholder="Contrase&ntilde;a" autocomplete="off">
-        </div>
-        <button class="subform-btn backus" id="btn-login-confirmar" type="button">Ingresar</button>
-        <div class="login-error" id="login-error-generico"></div>
+      <div>
+        <label for="sel-rol">Rol / Usuario</label>
+        <select id="sel-rol">
+          <option value="">Selecciona...</option>
+          <option value="BACKUS">BACKUS (ABInBev)</option>
+          <option value="EXTERNO">EXTERNO (Lavoro)</option>
+          <option value="BLOQUES">BLOQUES (Sorting)</option>
+        </select>
       </div>
     </div>
-    <div class="login-footer">Creado por Borys Orellana</div>
-  </div>
-</div>
+    <label for="input-usuario">Nombre del supervisor/encargado</label>
+    <input id="input-usuario" type="text" placeholder="Nombre y apellido">
+    <label for="input-pla" style="margin-top:10px;">Plan de Acción</label>
+    <input id="input-pla" type="text" placeholder="Texto del plan de acción">
+  </section>
 
-<!-- ================= APP ================= -->
-<div id="vista-app">
-  <div class="topbar">
-    <div class="brand"><span class="t2" style="color:var(--amber)">SIC</span> DIGITAL</div>
-    <div class="topbar-actions">
-      <button class="icon-btn solo-backus" id="btn-reset" title="Reiniciar el turno actual (nuevo reporte)">&#8635;</button>
-      <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
+  <!-- ===================== BACKUS ===================== -->
+  <section class="panel">
+    <h2>BACKUS <span class="estado-badge" id="estado-backus">ACTIVO</span></h2>
+    <div class="valores">
+      <div class="valor-caja"><label>ARMADOS</label><span id="armados-backus">0</span></div>
+      <div class="valor-caja"><label>CARGADOS</label><span id="cargados-backus">0</span></div>
+      <div class="valor-caja"><label>CUMPL.</label><span id="cumplimiento-backus">0%</span></div>
     </div>
-  </div>
+    <div class="btn-row">
+      <button class="btn btn-armado" onclick="enviarCambio('BACKUS','armados')">+1 Armados</button>
+      <button class="btn btn-cargado" onclick="enviarCambio('BACKUS','cargados')">+1 Cargados</button>
+    </div>
+    <small class="info">Supervisor: <span id="supervisor-backus">-</span> · PLA: <span id="pla-backus">-</span></small>
+  </section>
 
-  <main>
+  <!-- ===================== EXTERNO ===================== -->
+  <section class="panel">
+    <h2>EXTERNO <span class="estado-badge" id="estado-externo">ACTIVO</span></h2>
+    <div class="valores">
+      <div class="valor-caja"><label>ARMADOS</label><span id="armados-externo">0</span></div>
+      <div class="valor-caja"><label>CARGADOS</label><span id="cargados-externo">0</span></div>
+      <div class="valor-caja"><label>CUMPL.</label><span id="cumplimiento-externo">0%</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-armado" onclick="enviarCambio('EXTERNO','armados')">+1 Armados</button>
+      <button class="btn btn-cargado" onclick="enviarCambio('EXTERNO','cargados')">+1 Cargados</button>
+    </div>
+    <small class="info">Supervisor: <span id="supervisor-externo">-</span> · PLA: <span id="pla-externo">-</span></small>
+  </section>
 
-    <!-- Cabecera (solo Backus) -->
-    <section class="panel solo-backus">
-      <div class="marca-row">
-        <span class="marca-ab">AB InBev</span>
-        <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
-      </div>
-      <div class="grid2">
-        <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
-        <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
-        <div class="campo-mini"><label>Area</label><input id="c-area"></div>
-        <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-display" readonly value="-" title="Toca para silenciar la alarma"></div>
-        <div class="campo-mini full"><label>Monitoreo</label><input id="c-monitoreo"></div>
-      </div>
+  <!-- ===================== BLOQUES ===================== -->
+  <section class="panel">
+    <h2>BLOQUES <span class="estado-badge" id="estado-bloques">ACTIVO</span></h2>
+    <div class="valores">
+      <div class="valor-caja"><label>ARMADOS</label><span id="armados-bloques">0</span></div>
+      <div class="valor-caja"><label>CARGADOS</label><span id="cargados-bloques">0</span></div>
+      <div class="valor-caja"><label>CUMPL.</label><span id="cumplimiento-bloques">0%</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-armado" onclick="enviarCambio('BLOQUES','armados')">+1 Armados</button>
+      <button class="btn btn-cargado" onclick="enviarCambio('BLOQUES','cargados')">+1 Cargados</button>
+    </div>
+    <small class="info">Supervisor: <span id="supervisor-bloques">-</span> · PLA: <span id="pla-bloques">-</span></small>
+  </section>
 
-      <div class="fila-transp">
-        <div class="caja-transp">
-          <label>TRANSPORTES PROGRAMADOS<span>(de este turno)</span></label>
-          <input id="c-transportes" class="num" inputmode="numeric" value="74">
-        </div>
-        <div class="caja-estatus" id="btn-estatus">
-          <span class="led"></span>
-          <span>ESTATUS DE CARGA</span>
-        </div>
-      </div>
+  <!-- ===================== RESET (solo BACKUS) ===================== -->
+  <section class="panel">
+    <button class="btn btn-reset" id="btn-reset">FINALIZAR TURNO (RESET)</button>
+    <small class="info">Solo visible y habilitado para el rol BACKUS. Guarda un snapshot final en HISTÓRICO antes de reiniciar EXTERNO y BLOQUES del turno actual.</small>
+  </section>
 
-      <!-- Mensaje de estatus (se muestra al tocar el led) -->
-      <div id="panel-mensaje">
-        <div class="mensaje-caja" id="mensaje-texto"></div>
-        <div class="btn-row">
-          <button class="btn btn-ghost" id="btn-copiar-msg">Copiar</button>
-          <button class="btn btn-amber" id="btn-whatsapp-msg">Enviar por WhatsApp</button>
-        </div>
-      </div>
-    </section>
+  <!-- ===================== TOTALES HISTORICOS (pagina inicial) ===================== -->
+  <section class="panel">
+    <h2>Totales Históricos</h2>
+    <div class="totales-fila">
+      <div class="caja"><label>ARMADOS TOTAL</label><br><span id="total-armados-hist">0</span></div>
+      <div class="caja"><label>CARGADOS TOTAL</label><br><span id="total-cargados-hist">0</span></div>
+      <div class="caja"><label>REGISTROS</label><br><span id="total-registros-hist">0</span></div>
+    </div>
+    <div class="totales-fila">
+      <div class="caja"><label>MAÑANA</label><br><span id="total-armados-MAÑANA">0</span>/<span id="total-cargados-MAÑANA">0</span></div>
+      <div class="caja"><label>TARDE</label><br><span id="total-armados-TARDE">0</span>/<span id="total-cargados-TARDE">0</span></div>
+      <div class="caja"><label>NOCHE</label><br><span id="total-armados-NOCHE">0</span>/<span id="total-cargados-NOCHE">0</span></div>
+    </div>
+  </section>
 
-    <!-- Info simple + estatus (solo Lavoro) -->
-    <section class="panel solo-lavoro">
-      <div class="info-lavoro">
-        <div class="caja"><label>TURNO</label><span id="lv-turno">-</span></div>
-        <div class="caja"><label>FECHA</label><span id="lv-fecha">-</span></div>
-      </div>
-      <div class="caja-estatus" id="btn-estatus-armado" style="width:100%;">
-        <span class="led"></span>
-        <span>ESTATUS DE ARMADO</span>
-      </div>
-      <div id="panel-mensaje-armado" style="margin-top:12px;">
-        <div class="mensaje-caja" id="mensaje-texto-armado"></div>
-        <div class="btn-row">
-          <button class="btn btn-ghost" id="btn-copiar-msg-armado">Copiar</button>
-          <button class="btn btn-amber" id="btn-whatsapp-msg-armado">Enviar por WhatsApp</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= SECCION BLOQUES (solo Sorting) ================= -->
-    <section class="panel solo-sorting">
-      <div class="marca-row">
-        <span class="marca-ab">AB InBev</span>
-        <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
-      </div>
-      <div class="sorting-reloj" id="sorting-reloj">--/--/---- &middot; --:--:--</div>
-    </section>
-
-    <section class="panel solo-sorting">
-      <div class="panel-title small">Bloques</div>
-      <div id="bloques-lista"></div>
-    </section>
-
-    <section class="panel solo-sorting">
-      <div class="panel-title small">Avance de Meta Diaria<span class="tag" id="sorting-meta-tag">0 / 35,000</span></div>
-      <div class="sorting-meta-barra-wrap"><div class="sorting-meta-barra" id="sorting-meta-barra"></div></div>
-    </section>
-
-    <section class="panel solo-sorting">
-      <div class="panel-title small">Fuerza Laboral</div>
-      <div class="grid2">
-        <div class="campo-mini"><label>Personal Fijo</label><input id="sorting-personal-fijo" inputmode="numeric" value="12"></div>
-        <div class="campo-mini"><label>Personal Refuerzo</label><input id="sorting-personal-refuerzo" inputmode="numeric" value="0"></div>
-      </div>
-      <div class="sorting-total-personal" id="sorting-total-personal">Total Personal: 12 personas</div>
-      <label class="sorting-check-row">
-        <input type="checkbox" id="sorting-apoyo-validacion">
-        <span>Apoyo con Validaci&oacute;n</span>
-      </label>
-    </section>
-
-    <section class="panel solo-sorting">
-      <div class="caja-estatus" id="btn-estatus-sorting" style="width:100%;">
-        <span class="led"></span>
-        <span>ESTATUS DE BLOQUES</span>
-      </div>
-      <div id="panel-mensaje-sorting" style="margin-top:12px;">
-        <div class="mensaje-caja" id="mensaje-texto-sorting"></div>
-        <div class="btn-row">
-          <button class="btn btn-ghost" id="btn-copiar-msg-sorting">Copiar</button>
-          <button class="btn btn-amber" id="btn-whatsapp-msg-sorting">Enviar por WhatsApp</button>
-        </div>
-      </div>
-    </section>
-    <section class="panel solo-backus">
-      <div class="panel-title" id="titulo-grafico">Unidades cargadas x horas planificadas<span class="tag" id="tag-total">0/0</span></div>
-      <div class="chart-wrap"><canvas id="grafico"></canvas></div>
-      <div class="estado-fila">
-        <span class="dot" id="estado-dot" style="background:var(--rojo)"></span>
-        <span class="estado-txt" id="estado-txt">Sin datos a&uacute;n</span>
-        <span class="estado-pct num" id="estado-pct">0%</span>
-      </div>
-    </section>
-
-    <!-- Editar datos por hora (compartido, cada rol ve su campo; no aplica a Sorting) -->
-    <section class="panel oculto-sorting">
-      <div class="panel-title">
-        <span class="solo-backus">Editar datos</span>
-        <span class="solo-lavoro">Registrar Armados</span>
-      </div>
-      <div class="horas-grid" id="horas-grid"></div>
-
-      <div class="campo-dato solo-lavoro">
-        <label>Armados (esta hora)</label>
-        <input id="d-armado" inputmode="numeric" value="0">
-      </div>
-      <div class="campo-dato solo-backus">
-        <label>Transportes Cargados (esta hora)</label>
-        <input id="d-cargado" inputmode="numeric" value="0">
-      </div>
-
-      <button class="btn btn-amber" id="btn-actualizar" style="margin-top:6px;">Actualizar</button>
-    </section>
-
-    <!-- Planes de reaccion (solo Backus) -->
-    <section class="panel compact solo-backus">
-      <div class="panel-title small">Planes de reacci&oacute;n</div>
-      <div id="planes-lista"></div>
-    </section>
-
-    <!-- Historico (solo Backus) -->
-    <section class="panel solo-backus">
-      <div class="collapsible-head" data-target="hist-body">
-        <div class="panel-title" style="margin:0;">Hist&oacute;rico<span class="chev" id="chev-hist">&#9662;</span></div>
-      </div>
-      <div class="collapsible-body" id="hist-body">
-        <div id="hist-lista"></div>
-      </div>
-    </section>
-
-    <footer class="app-footer">SIC DIGITAL &middot; Creado por Borys Orellana</footer>
-  </main>
-</div>
-
-<div class="toast" id="toast"></div>
+</main>
 
 <script>
-(function(){
-  "use strict";
-
-  /* ============== CLAVES DE ALMACENAMIENTO ============== */
-  var SESSION_KEY = "t2sic_session"; // guarda el ROL activo: "backus" | "lavoro"
-  var DATA_KEY = "t2sic_data";
-  var HIST_KEY = "t2sic_historico";
-
-  /* ============== BACKEND EN LA NUBE (Google Apps Script + Sheets) ============== */
-  var API_URL = 'https://script.google.com/macros/s/AKfycby0635f-c9aodxWPHyaUxU03zAXdK9dQQnyNK5_z2pVCDJAPsfuJ6QeksjNAddO0YgW/exec';
-  var CLAVE_NUBE = 'sic2026';
-  var nubeGuardarTimeoutId = null;
-  var nubeGuardandoAhora = false;
-  var huboEdicionLocalPendiente = false;
-
-  var TURNOS_VALIDOS = ["Turno 1 - Ma\u00f1ana","Turno 2 - Tarde","Turno 3 - Nocturno"];
-
-  /* ============== ALMACENAMIENTO SEGURO ============== */
-  var memoria = {}, memoriaSesion = {};
-  function guardarValor(key, val){ try{ localStorage.setItem(key, val); }catch(e){ memoria[key] = val; } }
-  function leerValor(key){ try{ return localStorage.getItem(key); }catch(e){ return (key in memoria) ? memoria[key] : null; } }
-  function guardarSesion(key, val){ try{ sessionStorage.setItem(key, val); }catch(e){ memoriaSesion[key] = val; } }
-  function leerSesion(key){ try{ return sessionStorage.getItem(key); }catch(e){ return (key in memoriaSesion) ? memoriaSesion[key] : null; } }
-  function borrarSesion(key){ try{ sessionStorage.removeItem(key); }catch(e){} delete memoriaSesion[key]; }
-
-  /* ============== ESTADO ============== */
-  var estado = null;
-  var horaSelIdx = 0;
-  var rolActual = null; // "backus" | "lavoro"
-  var filtroInicioActual = "todos"; // "todos" | uno de TURNOS_VALIDOS
-
-  var TURNO_INICIO = {
-    "Turno 1 - Ma\u00f1ana": 7,   // 7:00 am a 3:00 pm
-    "Turno 2 - Tarde": 15,     // 3:00 pm a 11:00 pm
-    "Turno 3 - Nocturno": 23   // 11:00 pm a 7:00 am
-  };
-
-  // Hora de corte (reloj real) para cada turno: si al llegar a esta hora
-  // no se ha alcanzado el 50% del total programado, se activa la alarma.
-  var TURNO_CORTE = {
-    "Turno 1 - Ma\u00f1ana": {h:11, m:0},   // 11:00 am
-    "Turno 2 - Tarde": {h:19, m:0},        // 7:00 pm
-    "Turno 3 - Nocturno": {h:2, m:59}      // 2:59 am
-  };
-
-  function horaLabel(h24){
-    var h = ((h24 % 24) + 24) % 24;
-    var periodo = h < 12 ? "am" : "pm";
-    var h12 = h % 12; if(h12 === 0) h12 = 12;
-    return h12 + ":00 " + periodo;
-  }
-
-  // Genera las horas de reporte del turno. La primera hora del turno es
-  // solo el ingreso (no se trabaja ni se reporta nada), por eso el
-  // reporte arranca 1 hora despues del inicio y termina en la hora de
-  // cierre del turno (8 horas de trabajo reportadas en total).
-  function generarHorasPorTurno(turno){
-    var inicio = (turno && TURNO_INICIO.hasOwnProperty(turno)) ? TURNO_INICIO[turno] : TURNO_INICIO["Turno 3 - Nocturno"];
-    var horas = [];
-    for(var i=1; i<=8; i++){
-      horas.push({ hora: horaLabel(inicio + i), armado:0, cargado:0 });
-    }
-    return horas;
-  }
-
-  /* ============== REGISTROS SEPARADOS POR FECHA + TURNO ==============
-     Cada turno (y cada fecha) tiene su PROPIO registro independiente:
-     { horas: [...], transportesProgramados: N }
-     Nunca se comparten ni se copian datos entre turnos. */
-  function claveFecha(f){
-    var s = String(f||"").trim();
-    return s || "SIN_FECHA";
-  }
-
-  // Crea (si crear=true) o consulta (si crear=false) el registro de un
-  // turno especifico en una fecha especifica. Si no existe y crear es
-  // false, devuelve un registro transitorio vacio (no se guarda nada,
-  // solo sirve para lectura/visualizacion).
-  function obtenerRegistro(fecha, turno, crear){
-    if(!estado.datosPorTurno) estado.datosPorTurno = {};
-    var fk = claveFecha(fecha);
-    if(crear){
-      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-      if(!estado.datosPorTurno[fk][turno]){
-        estado.datosPorTurno[fk][turno] = {
-          horas: generarHorasPorTurno(turno),
-          transportesProgramados: 74
-        };
-      }
-      return estado.datosPorTurno[fk][turno];
-    }
-    if(estado.datosPorTurno[fk] && estado.datosPorTurno[fk][turno]){
-      return estado.datosPorTurno[fk][turno];
-    }
-    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0 };
-  }
-
-  // Registro del turno actualmente activo en la sesion (el que se esta
-  // editando ahora mismo). Se crea automaticamente si no existe todavia.
-  function registroActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistro(estado.fecha, estado.turno, true);
-  }
-
-  function calcularAcumuladoRegistro(reg){
-    var meta = (reg && reg.transportesProgramados) || 0;
-    var sumaArmado = 0, sumaCargado = 0;
-    ((reg && reg.horas) || []).forEach(function(h){
-      sumaArmado += (h.armado||0);
-      sumaCargado += (h.cargado||0);
-    });
-    return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
-  }
-
-  /* ============== DATOS DE SORTING (BLOQUES) - SEPARADOS POR TURNO+FECHA ==============
-     Estructura totalmente independiente de "datosPorTurno" (ABInBev/Externo).
-     Nunca se mezcla con los datos de armado/cargado. */
-  var META_SORTING = 35000;
-
-  function bloquesSortingPorDefecto(){
-    return [
-      { id:1, nombre:"Bloque 1", entrega:"10:00am", entregaVacia:false, nota:"Lo usa T1", corteH:10, corteM:0,  marcado:false, cajas:0 },
-      { id:2, nombre:"Bloque 2", entrega:"1:30pm",  entregaVacia:false, nota:"",          corteH:13, corteM:30, marcado:false, cajas:0 },
-      { id:3, nombre:"Bloque 3", entrega:"3:45pm",  entregaVacia:false, nota:"",          corteH:15, corteM:45, marcado:false, cajas:0 },
-      { id:4, nombre:"Bloque 4", entrega:"",        entregaVacia:true,  nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:5, nombre:"Bloque 5", entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:6, nombre:"Fila 4",   entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 }
-    ];
-  }
-
-  // Crea (crear=true) o consulta (crear=false) el registro de Sorting de
-  // un turno especifico en una fecha especifica. Igual que con los
-  // registros de ABInBev/Externo, nunca se comparte entre turnos.
-  function obtenerRegistroSorting(fecha, turno, crear){
-    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-    var fk = claveFecha(fecha);
-    if(crear){
-      if(!estado.sortingPorTurno[fk]) estado.sortingPorTurno[fk] = {};
-      if(!estado.sortingPorTurno[fk][turno]){
-        estado.sortingPorTurno[fk][turno] = {
-          bloques: bloquesSortingPorDefecto(),
-          personalFijo: 12,
-          personalRefuerzo: 0,
-          apoyoValidacion: false
-        };
-      }
-      return estado.sortingPorTurno[fk][turno];
-    }
-    if(estado.sortingPorTurno[fk] && estado.sortingPorTurno[fk][turno]){
-      return estado.sortingPorTurno[fk][turno];
-    }
-    return { bloques: bloquesSortingPorDefecto(), personalFijo:12, personalRefuerzo:0, apoyoValidacion:false };
-  }
-
-  function registroSortingActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistroSorting(estado.fecha, estado.turno, true);
-  }
-
-  // Un bloque esta "atrasado" si tiene hora de corte, no esta marcado, y
-  // la hora actual ya paso esa hora de corte.
-  function bloqueEstaAtrasado(bloque){
-    if(bloque.corteH === null || bloque.corteH === undefined) return false;
-    if(bloque.marcado) return false;
-    var ahora = new Date();
-    var ahoraMin = ahora.getHours()*60 + ahora.getMinutes();
-    var corteMin = bloque.corteH*60 + (bloque.corteM||0);
-    return ahoraMin >= corteMin;
-  }
-
-  function datosPorDefecto(){
-    return {
-      turno:"", nombreBackus:"", nombreLavoro:"", nombreSorting:"",
-      subarea:"T2", fecha:"", area:"LOG",
-      monitoreo:"Unidades cargadas x horas planificadas",
-      datosPorTurno:{},
-      sortingPorTurno:{},
-      planes:[
-        {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
-        {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
-        {n:3,accion:"Solicitar personal de carga de furgones para picking"},
-        {n:4,accion:""},
-        {n:5,accion:"Solicitar refuerzo con movilizador de otro turno"},
-        {n:6,accion:"Mantener"},
-        {n:7,accion:""},{n:8,accion:""},{n:9,accion:""},{n:10,accion:""}
-      ]
-    };
-  }
-
-  function fechaHoyStr(){
-    var d = new Date();
-    var dd = String(d.getDate()).padStart(2,"0");
-    var mm = String(d.getMonth()+1).padStart(2,"0");
-    var yy = d.getFullYear();
-    return dd+"/"+mm+"/"+yy;
-  }
-
-  function cargarEstado(){
-    try{
-      var raw = leerValor(DATA_KEY);
-      if(raw){ estado = JSON.parse(raw); }
-      else { estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    }catch(e){ estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    if(!estado.fecha) estado.fecha = fechaHoyStr();
-    if(!estado.datosPorTurno) estado.datosPorTurno = {};
-    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-    if(estado.nombreSorting === undefined) estado.nombreSorting = "";
-    // Migracion de formato antiguo (una sola tabla de horas compartida
-    // para todos los turnos) hacia el nuevo formato separado por turno.
-    if(estado.horas && estado.horas.length && estado.turno){
-      var fk = claveFecha(estado.fecha);
-      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-      if(!estado.datosPorTurno[fk][estado.turno]){
-        estado.datosPorTurno[fk][estado.turno] = {
-          horas: estado.horas,
-          transportesProgramados: estado.transportesProgramados || 74
-        };
-      }
-    }
-    delete estado.horas;
-    delete estado.transportesProgramados;
-  }
-
-  function guardarEstado(){
-    try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
-    guardarEnNube(estado);
-  }
-  function cargarHistorico(){ try{ var raw = leerValor(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
-  function guardarHistorico(lista){ try{ guardarValor(HIST_KEY, JSON.stringify(lista)); }catch(e){} }
-
-  /* ============== SINCRONIZACION EN LA NUBE ==============
-     localStorage sigue siendo la copia inmediata y segura (nunca se
-     deja de escribir ahi). Ademas, se manda TODO el estado actual a
-     Google Sheets via el backend de Apps Script, para que cualquier
-     dispositivo pueda leer la misma informacion. Si la red falla, los
-     datos ya quedaron a salvo en localStorage y no se pierde nada. */
-
-  function nombreUsuarioActualParaNube(){
-    if(rolActual === "backus") return estado.nombreBackus || "";
-    if(rolActual === "lavoro") return estado.nombreLavoro || "";
-    if(rolActual === "sorting") return estado.nombreSorting || "";
-    return "";
-  }
-
-  // Guarda con un pequeno "debounce": si el usuario esta escribiendo
-  // rapido (varias teclas seguidas), se agrupan los guardados y solo se
-  // manda UNA peticion a la nube con el estado mas reciente, en vez de
-  // una peticion por cada tecla.
-  function guardarEnNube(datos){
-    if(!rolActual) return; // sin sesion activa no hay nada que sincronizar
-    huboEdicionLocalPendiente = true;
-    if(nubeGuardarTimeoutId) clearTimeout(nubeGuardarTimeoutId);
-    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 1200);
-  }
-
-  async function enviarANube(datos){
-    if(!rolActual){ huboEdicionLocalPendiente = false; return; }
-    nubeGuardandoAhora = true;
-    try{
-      var cuerpo = {
-        clave: CLAVE_NUBE,
-        tipo: "en_vivo", // sincronizacion en tiempo real -> siempre va a la hoja EN_VIVO
-        rol: rolActual,
-        fecha: estado.fecha || "",
-        turno: estado.turno || "",
-        usuario: nombreUsuarioActualParaNube()
-      };
-      // Se copia TODO lo que venga en "datos" (sin filtrar nada), tal
-      // como pide el backend de Apps Script.
-      if(datos && typeof datos === "object"){
-        Object.keys(datos).forEach(function(k){ cuerpo[k] = datos[k]; });
-      }
-      var resp = await fetch(API_URL, {
-        method: "POST",
-        // text/plain evita el preflight CORS que Apps Script no responde.
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(cuerpo)
-      });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = null;
-      try{ json = await resp.json(); }catch(e){ json = null; }
-      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
-    }catch(err){
-      console.error("No se pudo guardar en la nube (se mantiene en localStorage):", err);
-    }finally{
-      nubeGuardandoAhora = false;
-      huboEdicionLocalPendiente = false;
-    }
-  }
-
-  // --- Reconstruccion del estado a partir de las filas planas de Sheets ---
-
-  function parseTimestampNube(ts){
-    var m = String(ts||"").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
-    if(!m) return 0;
-    return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6])).getTime();
-  }
-
-  function coaccionarValorNube(v){
-    if(v === "" || v === null || v === undefined) return "";
-    var s = String(v);
-    if(s === "true") return true;
-    if(s === "false") return false;
-    if(/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
-    if((s.charAt(0)==="{" && s.charAt(s.length-1)==="}") || (s.charAt(0)==="[" && s.charAt(s.length-1)==="]")){
-      try{ return JSON.parse(s); }catch(e){}
-    }
-    return s;
-  }
-
-  // Convierte "a.b[2].c" en ["a","b",2,"c"] para poder reconstruir el
-  // objeto anidado original a partir de la clave plana guardada en Sheets.
-  function desglosarRutaNube(ruta){
-    var partes = [];
-    String(ruta).split(".").forEach(function(seg){
-      var base = seg.replace(/\[\d+\]/g, "");
-      if(base !== "") partes.push(base);
-      var idxs = seg.match(/\[(\d+)\]/g) || [];
-      idxs.forEach(function(im){ partes.push(Number(im.slice(1,-1))); });
-    });
-    return partes;
-  }
-
-  function asignarEnRutaNube(obj, partes, valor){
-    var actual = obj;
-    for(var i=0; i<partes.length-1; i++){
-      var key = partes[i];
-      var siguienteEsIndice = (typeof partes[i+1] === "number");
-      if(actual[key] === undefined || actual[key] === null || typeof actual[key] !== "object"){
-        actual[key] = siguienteEsIndice ? [] : {};
-      }
-      actual = actual[key];
-    }
-    actual[partes[partes.length-1]] = valor;
-  }
-
-  // Combina las 3 hojas (BACKUS/EXTERNO/SORTING): para cada clave_dato
-  // se queda con la fila mas reciente (por timestamp) sin importar de
-  // que hoja venga, y reconstruye el arbol de datos original.
-  function reconstruirEstadoDesdeNube(dataPorHoja){
-    var porClave = {};
-    // La sincronizacion en tiempo real vive UNICAMENTE en la hoja EN_VIVO.
-    // BACKUS/EXTERNO/SORTING ya no se usan para esto: esas 3 hojas ahora
-    // solo guardan 1 fila de reporte por status enviado a WhatsApp.
-    (dataPorHoja["EN_VIVO"] || []).forEach(function(fila){
-      var clave = fila.clave_dato;
-      if(clave === undefined || clave === null || clave === "") return;
-      var t = parseTimestampNube(fila.timestamp);
-      var actual = porClave[clave];
-      if(!actual || t >= actual.t){
-        porClave[clave] = { valor: fila.valor_dato, t: t };
-      }
-    });
-
-    var claves = Object.keys(porClave);
-    if(!claves.length) return null;
-
-    var reconstruido = datosPorDefecto();
-    claves.forEach(function(clave){
-      var partes = desglosarRutaNube(clave);
-      if(!partes.length) return;
-      asignarEnRutaNube(reconstruido, partes, coaccionarValorNube(porClave[clave].valor));
-    });
-
-    if(!reconstruido.fecha) reconstruido.fecha = fechaHoyStr();
-    if(!reconstruido.datosPorTurno) reconstruido.datosPorTurno = {};
-    if(!reconstruido.sortingPorTurno) reconstruido.sortingPorTurno = {};
-    if(reconstruido.nombreSorting === undefined) reconstruido.nombreSorting = "";
-    return reconstruido;
-  }
-
-  /* ============== REPORTE DE STATUS (1 fila por click en "Enviar por WhatsApp") ==============
-     Esto es independiente de la sincronizacion en tiempo real (EN_VIVO).
-     Guarda SOLO 1 fila en la hoja BACKUS/EXTERNO/SORTING segun el rol
-     activo. Si ya existe esa fecha+turno+hora_reporte, el backend la
-     actualiza en vez de duplicarla. */
-  async function enviarReporteStatus(camposReporte, mensajeExacto){
-    if(!rolActual) return;
-    try{
-      var cuerpo = {
-        clave: CLAVE_NUBE,
-        tipo: "reporte",
-        rol: rolActual,
-        fecha: estado.fecha || "",
-        turno: estado.turno || "",
-        usuario: nombreUsuarioActualParaNube(),
-        comentario_status: mensajeExacto || ""
-      };
-      if(camposReporte && typeof camposReporte === "object"){
-        Object.keys(camposReporte).forEach(function(k){ cuerpo[k] = camposReporte[k]; });
-      }
-      var resp = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(cuerpo)
-      });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = null;
-      try{ json = await resp.json(); }catch(e){ json = null; }
-      if(!json || json.success !== true) throw new Error((json && json.error) || "Respuesta invalida del servidor");
-    }catch(err){
-      console.error("No se pudo enviar el reporte de status a la nube:", err);
-    }
-  }
-
-  async function cargarDeNube(){
-    try{
-      var resp = await fetch(API_URL, { method: "GET" });
-      if(!resp.ok) throw new Error("HTTP " + resp.status);
-      var json = await resp.json();
-      if(!json || json.success !== true || !json.data) throw new Error((json && json.error) || "Respuesta invalida del servidor");
-
-      // Si hay una edicion local recien hecha (o en camino de guardarse),
-      // no se pisa con lo que venga de la nube en este ciclo.
-      if(huboEdicionLocalPendiente || nubeGuardandoAhora) return;
-
-      var estadoNube = reconstruirEstadoDesdeNube(json.data);
-      if(!estadoNube) return;
-
-      estado = estadoNube;
-      try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
-
-      if(document.getElementById("vista-app").style.display !== "none"){
-        render();
-      }
-      actualizarDashboardInicio();
-    }catch(err){
-      console.error("No se pudo leer de la nube (se sigue usando localStorage):", err);
-    }
-  }
-
-  function toast(msg){
-    var t = document.getElementById("toast");
-    t.textContent = msg;
-    t.classList.add("show");
-    clearTimeout(toast._tm);
-    toast._tm = setTimeout(function(){ t.classList.remove("show"); }, 2200);
-  }
-
-  function escapeAttr(s){
-    return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
-  }
-
-  // Nombre CORTO del turno que ve el usuario: solo "Ma\u00f1ana" / "Tarde" /
-  // "Noche" (sin la palabra "Turno", para no repetirla en textos que ya
-  // dicen "Turno: ..." o en la etiqueta "TURNO"). Esto es SOLO texto de
-  // presentacion: las claves internas usadas para guardar y filtrar
-  // datos ("Turno 1 - Ma\u00f1ana", etc.) no cambian en ningun lado.
-  function nombreCortoTurno(turno){
-    if(turno === "Turno 1 - Ma\u00f1ana") return "Ma\u00f1ana";
-    if(turno === "Turno 2 - Tarde") return "Tarde";
-    if(turno === "Turno 3 - Nocturno") return "Noche";
-    return turno || "-";
-  }
-
-  /* ============== PANTALLA INICIAL: MENU DE USUARIO ============== */
-  var CLAVE_ABINBEV = "@vpo2026";
-  var rolSeleccionado = null; // "backus" (ABInBev) | "lavoro" (Externo)
-
-  var elUserMenu = document.getElementById("user-menu");
-  var elBtnUserMenu = document.getElementById("btn-user-menu");
-  var elFormLogin = document.getElementById("form-login");
-  var elCampoPass = document.getElementById("campo-pass-login");
-  var elFormLoginTitulo = document.getElementById("form-login-titulo");
-
-  function cerrarMenuUsuario(){
-    elUserMenu.classList.remove("open");
-    elBtnUserMenu.setAttribute("aria-expanded", "false");
-  }
-
-  elBtnUserMenu.addEventListener("click", function(e){
-    e.stopPropagation();
-    var abrir = !elUserMenu.classList.contains("open");
-    if(abrir){ elUserMenu.classList.add("open"); elBtnUserMenu.setAttribute("aria-expanded","true"); }
-    else { cerrarMenuUsuario(); }
-  });
-
-  document.addEventListener("click", function(e){
-    if(!elUserMenu.contains(e.target) && e.target !== elBtnUserMenu){
-      cerrarMenuUsuario();
-    }
-  });
-
-  function abrirFormularioLogin(rol){
-    rolSeleccionado = rol;
-    cerrarMenuUsuario();
-    document.getElementById("login-error-generico").textContent = "";
-    document.getElementById("in-turno-login").value = "";
-    document.getElementById("in-nombre-login").value = "";
-    document.getElementById("in-pass-login").value = "";
-    if(rol === "backus"){
-      elFormLoginTitulo.textContent = "Ingresar \u00b7 ABInBev";
-      elCampoPass.style.display = "block";
-    } else if(rol === "sorting"){
-      elFormLoginTitulo.textContent = "Ingresar \u00b7 Sorting";
-      elCampoPass.style.display = "none";
-    } else {
-      elFormLoginTitulo.textContent = "Ingresar \u00b7 Externo";
-      elCampoPass.style.display = "none";
-    }
-    elFormLogin.classList.add("open");
-  }
-
-  document.getElementById("opt-abinbev").addEventListener("click", function(){ abrirFormularioLogin("backus"); });
-  document.getElementById("opt-externo").addEventListener("click", function(){ abrirFormularioLogin("lavoro"); });
-  document.getElementById("opt-sorting").addEventListener("click", function(){ abrirFormularioLogin("sorting"); });
-
-  document.getElementById("btn-login-confirmar").addEventListener("click", function(){
-    var err = document.getElementById("login-error-generico");
-    try{
-      if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev, Externo o Sorting primero."; return; }
-      var turno = document.getElementById("in-turno-login").value;
-      var nombre = document.getElementById("in-nombre-login").value.trim();
-      if(!turno){ err.textContent = "Selecciona tu turno."; return; }
-      if(!nombre){ err.textContent = "Ingresa tus nombres completos."; return; }
-      if(rolSeleccionado === "backus"){
-        var pass = document.getElementById("in-pass-login").value;
-        if(pass !== CLAVE_ABINBEV){ err.textContent = "Contrase\u00f1a incorrecta."; return; }
-      }
-      err.textContent = "";
-      if(!estado) cargarEstado();
-      estado.turno = turno;
-      // Cada rol guarda su propio registro, por su propia clave
-      // fecha+turno. Nunca se mezclan entre si.
-      if(rolSeleccionado === "backus"){
-        estado.nombreBackus = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
-      } else if(rolSeleccionado === "sorting"){
-        estado.nombreSorting = nombre;
-        obtenerRegistroSorting(estado.fecha, turno, true);
-      } else {
-        estado.nombreLavoro = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
-      }
-      horaSelIdx = 0;
-      guardarEstado();
-      guardarSesion(SESSION_KEY, rolSeleccionado);
-      mostrarApp(rolSeleccionado);
-    }catch(e){
-      err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
-    }
-  });
-
-  function mostrarApp(rol){
-    rolActual = rol;
-    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
-    document.body.classList.add("rol-" + rol);
-    document.getElementById("vista-login").style.display = "none";
-    document.getElementById("vista-app").style.display = "block";
-    if(!estado) cargarEstado();
-    render();
-  }
-
-  function cerrarSesion(){
-    borrarSesion(SESSION_KEY);
-    rolActual = null;
-    rolSeleccionado = null;
-    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
-    document.getElementById("vista-app").style.display = "none";
-    document.getElementById("vista-login").style.display = "flex";
-    document.getElementById("in-turno-login").value = "";
-    document.getElementById("in-nombre-login").value = "";
-    document.getElementById("in-pass-login").value = "";
-    document.getElementById("login-error-generico").textContent = "";
-    elFormLogin.classList.remove("open");
-    cerrarMenuUsuario();
-    detenerAlarmaSorting();
-    actualizarDashboardInicio();
-  }
-
-  document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
-
-  document.getElementById("btn-reset").addEventListener("click", function(){
-    if(!estado || !estado.turno) return;
-    var ok = confirm(
-      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(estado.turno) + ") a cero:\n\n" +
-      "- Transportes programados de este turno\n" +
-      "- Armados y Cargados de todas las horas de este turno\n\n" +
-      "Los datos de los OTROS turnos y el hist\u00f3rico ya guardado NO se borran.\n\n" +
-      "\u00bfSeguro que quieres continuar?"
-    );
-    if(!ok) return;
-
-    var fk = claveFecha(estado.fecha);
-    if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-    estado.datosPorTurno[fk][estado.turno] = {
-      horas: generarHorasPorTurno(estado.turno),
-      transportesProgramados: 74
-    };
-    horaSelIdx = 0;
-
-    guardarEstado();
-    silenciarAlarma(true);
-    render();
-    toast("Reporte del turno reiniciado. Los dem\u00e1s turnos no se modificaron.");
-  });
-
-  /* ============== RENDER: CABECERA (Backus) ============== */
-  function bindCabecera(){
-    var reg = registroActual();
-    document.getElementById("c-subarea").value = estado.subarea;
-    document.getElementById("c-fecha").value = estado.fecha;
-    document.getElementById("c-area").value = estado.area;
-    document.getElementById("c-monitoreo").value = estado.monitoreo;
-    document.getElementById("c-transportes").value = reg ? reg.transportesProgramados : 0;
-    document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
-
-    document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
-    document.getElementById("c-fecha").oninput = function(){
-      estado.fecha = this.value; guardarEstado();
-      // Cambiar de fecha mueve el contexto a otro registro (fecha+turno);
-      // nunca mezcla datos entre fechas ni entre turnos.
-      obtenerRegistro(estado.fecha, estado.turno, true);
-      horaSelIdx = 0;
-      bindInfoLavoro();
-      renderHorasGrid();
-      bindDatosHora();
-      dibujarGrafico();
-      renderHistorico();
-      actualizarMensaje();
-      actualizarMensajeArmado();
-      verificarAlarma();
-      document.getElementById("c-transportes").value = registroActual().transportesProgramados;
-    };
-    document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarEstado(); };
-    document.getElementById("c-monitoreo").oninput = function(){
-      estado.monitoreo = this.value; guardarEstado();
-      document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
-    };
-    document.getElementById("c-transportes").oninput = function(){
-      var r = registroActual();
-      if(!r) return;
-      r.transportesProgramados = Number(this.value)||0;
-      guardarEstado();
-      dibujarGrafico();
-      actualizarMensaje();
-      actualizarMensajeArmado();
-      verificarAlarma();
-    };
-
-    actualizarUIPlanAccion();
-  }
-
-  /* ============== INFO SIMPLE (Lavoro) ============== */
-  function bindInfoLavoro(){
-    document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
-    document.getElementById("lv-fecha").textContent = estado.fecha || "-";
-  }
-
-  /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
-  function generarMensaje(){
-    calcularPorcentajes();
-    var reg = registroActual();
-    var h = (reg && reg.horas[horaSelIdx]) || {};
-    var meta = reg ? reg.transportesProgramados : 0;
-    var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
-    return "STATUS DE CARGA\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
-      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + (estado.fecha || "-") + "\n" +
-      "Hora: " + (h.hora || "-") + "\n" +
-      "Armados (acum.): " + (h.acumArmado||0) + "\n" +
-      "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
-      "Cumplimiento: " + pct + "%";
-  }
-
-  function actualizarMensaje(){
-    document.getElementById("mensaje-texto").textContent = generarMensaje();
-  }
-
-  document.getElementById("btn-estatus").addEventListener("click", function(){
-    var panel = document.getElementById("panel-mensaje");
-    actualizarMensaje();
-    panel.classList.toggle("open");
-  });
-
-  document.getElementById("btn-copiar-msg").addEventListener("click", function(){
-    copiarTexto(generarMensaje());
-  });
-
-  document.getElementById("btn-whatsapp-msg").addEventListener("click", function(){
-    var mensaje = generarMensaje();
-    enviarPorWhatsapp(mensaje);
-    var reg = registroActual();
-    var h = (reg && reg.horas[horaSelIdx]) || {};
-    var meta = reg ? (reg.transportesProgramados || 0) : 0;
-    var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
-    enviarReporteStatus({
-      hora_reporte: h.hora || "",
-      armados_meta: meta,
-      cargados_meta: meta,
-      armados_hoy: h.acumArmado || 0,
-      cargados_hoy: h.acumCargado || 0,
-      eficiencia: pct
-    }, mensaje);
-  });
-
-  /* ============== ESTATUS DE ARMADO (mensaje Lavoro) ============== */
-  function generarMensajeArmado(){
-    calcularPorcentajes();
-    var reg = registroActual();
-    var h = (reg && reg.horas[horaSelIdx]) || {};
-    var meta = reg ? (reg.transportesProgramados || 0) : 0;
-    var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
-    return "STATUS DE ARMADO\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Encargado: " + (estado.nombreLavoro || "-") + "\n" +
-      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + (estado.fecha || "-") + "\n" +
-      "Hora: " + (h.hora || "-") + "\n" +
-      "Armado (acum.): " + (h.acumArmado||0) + " / " + meta + "\n" +
-      "Avance de armado: " + pctArmado + "%";
-  }
-
-  function actualizarMensajeArmado(){
-    var el = document.getElementById("mensaje-texto-armado");
-    if(el) el.textContent = generarMensajeArmado();
-  }
-
-  document.getElementById("btn-estatus-armado").addEventListener("click", function(){
-    var panel = document.getElementById("panel-mensaje-armado");
-    actualizarMensajeArmado();
-    panel.classList.toggle("open");
-  });
-
-  document.getElementById("btn-copiar-msg-armado").addEventListener("click", function(){
-    copiarTexto(generarMensajeArmado());
-  });
-
-  document.getElementById("btn-whatsapp-msg-armado").addEventListener("click", function(){
-    var mensaje = generarMensajeArmado();
-    enviarPorWhatsapp(mensaje);
-    var reg = registroActual();
-    var h = (reg && reg.horas[horaSelIdx]) || {};
-    var meta = reg ? (reg.transportesProgramados || 0) : 0;
-    var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
-    enviarReporteStatus({
-      hora_reporte: h.hora || "",
-      armados_meta: meta,
-      cargados_meta: meta,
-      armados_hoy: h.acumArmado || 0,
-      cargados_hoy: h.acumCargado || 0,
-      eficiencia: pctArmado
-    }, mensaje);
-  });
-
-  function copiarTexto(texto){
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(texto).then(function(){ toast("Mensaje copiado"); })
-        .catch(function(){ copiarFallback(texto); });
-    } else {
-      copiarFallback(texto);
-    }
-  }
-
-  function copiarFallback(texto){
-    try{
-      var ta = document.createElement("textarea");
-      ta.value = texto;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      toast("Mensaje copiado");
-    }catch(e){ toast("No se pudo copiar"); }
-  }
-
-  function enviarPorWhatsapp(texto){
-    window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
-  }
-
-  /* ============== HORAS: SELECTOR + CAMPOS (compartido) ============== */
-  function renderHorasGrid(){
-    var cont = document.getElementById("horas-grid");
-    cont.innerHTML = "";
-    var reg = registroActual();
-    if(!reg) return;
-    reg.horas.forEach(function(h, i){
-      var tieneDatos = (h.armado||h.cargado) ? true : false;
-      var btn = document.createElement("div");
-      btn.className = "hora-btn" + (i === horaSelIdx ? " activa" : "");
-      btn.innerHTML = escapeAttr(h.hora) + (tieneDatos ? '<span class="chk">&#10003;</span>' : '');
-      btn.addEventListener("click", function(){
-        horaSelIdx = i;
-        renderHorasGrid();
-        bindDatosHora();
-        dibujarGrafico();
-        actualizarMensaje();
-        actualizarMensajeArmado();
-      });
-      cont.appendChild(btn);
-    });
-  }
-
-  function bindDatosHora(){
-    var reg = registroActual();
-    if(!reg) return;
-    var h = reg.horas[horaSelIdx];
-    document.getElementById("d-armado").value = h.armado || 0;
-    var elCargado = document.getElementById("d-cargado");
-    elCargado.value = h.cargado || 0;
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
-      elCargado.disabled = true;
-      elCargado.title = "No se permite registrar Cargados a la 1:00 am (Turno Noche).";
-    } else {
-      elCargado.disabled = false;
-      elCargado.removeAttribute("title");
-    }
-  }
-
-  // Regla especial: para el usuario ABInBev, en el Turno Noche, la hora
-  // 1:00 am no admite edicion de "Cargados" (solo esa hora puntual).
-  function cargadoBloqueadoEnHora(turno, horaTxt){
-    return turno === "Turno 3 - Nocturno" && horaTxt === "1:00 am";
-  }
-
-  // Regla de negocio: primero se ARMA y despues se CARGA, por lo tanto el
-  // acumulado de CARGADOS nunca puede superar al acumulado de ARMADOS
-  // hasta esa misma hora. Devuelve cuantos "cargados" como maximo se
-  // pueden registrar en la hora "idx" sin romper esa regla.
-  function maxCargadoPermitidoEnHora(reg, idx){
-    var cumArmadoHastaHora = 0;
-    for(var i=0; i<=idx; i++){ cumArmadoHastaHora += (reg.horas[i].armado||0); }
-    var cumCargadoHorasAnteriores = 0;
-    for(var j=0; j<idx; j++){ cumCargadoHorasAnteriores += (reg.horas[j].cargado||0); }
-    var max = cumArmadoHastaHora - cumCargadoHorasAnteriores;
-    return max > 0 ? max : 0;
-  }
-
-  document.getElementById("d-armado").addEventListener("input", function(){
-    var reg = registroActual();
-    if(!reg) return;
-    reg.horas[horaSelIdx].armado = Number(this.value)||0;
-    // Si al bajar el armado, el cargado ya registrado en esta hora queda
-    // por encima de lo permitido, se ajusta automaticamente hacia abajo.
-    var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
-    if((reg.horas[horaSelIdx].cargado||0) > maxPermitido){
-      reg.horas[horaSelIdx].cargado = maxPermitido;
-      document.getElementById("d-cargado").value = maxPermitido;
-      toast("Cargados ajustado: no puede superar lo armado (m\u00e1x. " + maxPermitido + ")");
-    }
-    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
-  });
-  document.getElementById("d-cargado").addEventListener("input", function(){
-    var reg = registroActual();
-    if(!reg) return;
-    var h = reg.horas[horaSelIdx];
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
-      // Bloqueo duro por si el input llega a habilitarse por otra via.
-      this.value = h.cargado || 0;
-      toast("No se permite registrar Cargados a la 1:00 am (Turno Noche).");
-      return;
-    }
-    var valor = Number(this.value)||0;
-    var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
-    if(valor > maxPermitido){
-      valor = maxPermitido;
-      this.value = valor;
-      toast("No puedes cargar m\u00e1s de lo armado. M\u00e1ximo permitido: " + maxPermitido);
-    }
-    reg.horas[horaSelIdx].cargado = valor;
-    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
-  });
-
-  /* ============== PLANES (solo Backus) ============== */
-  function renderPlanes(){
-    var cont = document.getElementById("planes-lista");
-    cont.innerHTML = "";
-    estado.planes.forEach(function(p, i){
-      var row = document.createElement("div");
-      row.className = "plan-row";
-      row.innerHTML = '<div class="plan-num">'+p.n+'</div><input data-i="'+i+'" placeholder="Acci\u00f3n..." value="'+escapeAttr(p.accion)+'">';
-      cont.appendChild(row);
-    });
-    cont.querySelectorAll("input").forEach(function(inp){
-      inp.addEventListener("input", function(){
-        estado.planes[Number(this.dataset.i)].accion = this.value;
-        guardarEstado();
-      });
-    });
-  }
-
-  /* ============== CALCULO (compartido) ============== */
-  // "armado"/"cargado" de cada hora son lo hecho EN ESA hora, dentro del
-  // registro del turno actualmente activo. Aqui se calcula el acumulado
-  // (suma) hora a hora para los graficos y porcentajes de ese turno,
-  // sin tocar los datos de ningun otro turno.
-  function calcularPorcentajes(){
-    var reg = registroActual();
-    if(!reg) return 0;
-    var meta = reg.transportesProgramados || 0;
-    var sumaArmado = 0, sumaCargado = 0;
-    reg.horas.forEach(function(h){
-      sumaArmado += (h.armado||0);
-      sumaCargado += (h.cargado||0);
-      h.acumArmado = sumaArmado;
-      h.acumCargado = sumaCargado;
-      h.pct = meta > 0 ? sumaCargado / meta : 0;
-      h.pctArmado = meta > 0 ? sumaArmado / meta : 0;
-    });
-    return meta;
-  }
-
-  /* ============== GRAFICO PRINCIPAL (solo Backus, canvas nativo) ============== */
-  function dibujarGrafico(){
-    var reg = registroActual();
-    if(!reg) return;
-    var meta = calcularPorcentajes();
-    var horas = reg.horas;
-    var canvas = document.getElementById("grafico");
-    var wrap = canvas.parentElement;
-    if(!wrap || !horas.length) return;
-
-    var dpr = window.devicePixelRatio || 1;
-    var cssW = wrap.clientWidth || 300;
-    var cssH = wrap.clientHeight || 220;
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    canvas.style.width = cssW + "px";
-    canvas.style.height = cssH + "px";
-
-    var ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-
-    var padL = 32, padR = 18, padT = 8, padB = 40;
-    var chartW = Math.max(10, cssW - padL - padR);
-    var chartH = Math.max(10, cssH - padT - padB);
-    var n = horas.length;
-
-    function xPos(i){ return padL + (n <= 1 ? chartW/2 : (i/(n-1)) * chartW); }
-    function yPos(frac){ var maxVal = 1.05; return padT + chartH - (Math.max(0,Math.min(frac,maxVal))/maxVal) * chartH; }
-
-    ctx.strokeStyle = "rgba(255,255,255,0.07)";
-    ctx.fillStyle = "#8d99a3";
-    ctx.font = "9px Inter, sans-serif";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.lineWidth = 1;
-    [0, 0.25, 0.5, 0.75, 1].forEach(function(f){
-      var y = yPos(f);
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
-      ctx.fillText(Math.round(f*100) + "%", padL - 6, y);
-    });
-
-    /* FONDO ESTATICO escalonado rojo/verde: es un tablero fijo, NUNCA
-       se recalcula con datos reales. Cada escalon representa el avance
-       ideal esperado a esa hora (i+1 de n horas del turno), dividiendo
-       el turno en partes iguales hasta el 100%. Este fondo no cambia
-       aunque cambien los datos: lo unico dinamico es la linea negra de
-       abajo, que sube y baja segun el % real acumulado de cada hora. */
-    var pctPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(h.pct||0)}; });
-
-    for(var s=0; s<n; s++){
-      var xa = xPos(s);
-      var xb = (s < n-1) ? xPos(s+1) : (padL + chartW);
-      var metaEscalonFijo = (s+1) / n; // escalon fijo, no depende de datos reales
-      var yLimite = yPos(metaEscalonFijo);
-      var yTop = yPos(1);
-      var yBase = yPos(0);
-      // bloque rojo fijo (lo que falta hasta la meta de esa hora)
-      ctx.fillStyle = "#C00000";
-      ctx.fillRect(xa, yLimite, xb-xa, yBase-yLimite);
-      // bloque verde fijo (meta ya cubierta a esa hora)
-      ctx.fillStyle = "#00B050";
-      ctx.fillRect(xa, yTop, xb-xa, yLimite-yTop);
-    }
-
-    if(pctPts.length){
-      ctx.beginPath();
-      pctPts.forEach(function(p,i){ i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); });
-      ctx.strokeStyle = "#eef1f3";
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = "round"; ctx.lineCap = "round";
-      ctx.stroke();
-
-      pctPts.forEach(function(p,i){
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3.5, 0, Math.PI*2);
-        ctx.fillStyle = "#eef1f3";
-        ctx.fill();
-        var label = Math.round((horas[i].pct||0)*100) + "%";
-        ctx.font = "600 10px 'Roboto Mono', monospace";
-        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-        ctx.fillText(label, p.x, p.y - 7);
-      });
-    }
-
-    // Etiquetas de hora en el eje X, en HORIZONTAL, bien espaciadas.
-    ctx.fillStyle = "#8d99a3";
-    ctx.font = "9px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    horas.forEach(function(h,i){
-      var x = xPos(i);
-      var y = padT + chartH + 10;
-      ctx.fillText(h.hora, x, y);
-    });
-
-    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0};
-    var pctUlt = Math.round((actual.pct||0)*100);
-    var dot = document.getElementById("estado-dot");
-    var txt = document.getElementById("estado-txt");
-    var pctEl = document.getElementById("estado-pct");
-    var color, mensaje;
-    if(pctUlt >= 90){ color="var(--verde)"; mensaje="En verde, dentro de meta"; }
-    else if(pctUlt >= 50){ color="var(--amber)"; mensaje="En rango de alerta"; }
-    else { color="var(--rojo)"; mensaje="En rojo, requiere plan de reacci\u00f3n"; }
-    dot.style.background = color;
-    txt.textContent = mensaje;
-    pctEl.textContent = pctUlt + "%";
-    pctEl.style.color = color;
-
-    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(reg.transportesProgramados||0);
-  }
-
-  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ==============
-     Se filtra por turno usando "filtroInicioActual". Si es "todos", se
-     suman los 3 turnos de la fecha actual (Total del Dia). Nunca mezcla
-     ni copia datos entre turnos: cada uno se lee de su propio registro. */
-  function dibujarGraficoInicio(pctArmado, pctCargado){
-    var canvas = document.getElementById("grafico-inicio");
-    if(!canvas) return;
-    var wrap = canvas.parentElement;
-    var dpr = window.devicePixelRatio || 1;
-    var cssW = (wrap && wrap.clientWidth) || 260;
-    var cssH = 150;
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    canvas.style.width = cssW + "px";
-    canvas.style.height = cssH + "px";
-
-    var ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-
-    var padB = 22, padT = 22;
-    var chartH = cssH - padB - padT;
-    var barW = Math.min(52, cssW*0.16);
-    var gap = Math.min(56, cssW*0.18);
-    var startX = cssW/2 - (barW*2 + gap)/2;
-
-    function barra(x, pct, color, label){
-      var pctClamp = Math.max(0, Math.min(pct, 100));
-      var h = Math.max(2, (pctClamp/100) * chartH);
-      var y = padT + chartH - h;
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(x, padT, barW, chartH);
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, barW, h);
-      ctx.fillStyle = "#eef1f3";
-      ctx.font = "700 12px 'Roboto Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(Math.round(pctClamp) + "%", x + barW/2, y - 7);
-      ctx.fillStyle = "#8d99a3";
-      ctx.font = "9px Inter, sans-serif";
-      ctx.fillText(label, x + barW/2, cssH - 8);
-    }
-
-    barra(startX, pctArmado, "#4aa8ff", "ARMADO");
-    barra(startX + barW + gap, pctCargado, "#f2a900", "CARGADO");
-  }
-
-  function etiquetaCortaTurno(t){
-    if(!t) return "Total del d\u00eda";
-    return nombreCortoTurno(t);
-  }
-
-  function actualizarDashboardInicio(){
-    if(!estado) cargarEstado();
-    if(!estado){ return; }
-
-    var fechaRef = estado.fecha || fechaHoyStr();
-    var totalArmado = 0, totalCargado = 0, meta = 0;
-
-    if(filtroInicioActual !== "todos"){
-      var reg = obtenerRegistro(fechaRef, filtroInicioActual, false);
-      var c = calcularAcumuladoRegistro(reg);
-      totalArmado = c.armado; totalCargado = c.cargado; meta = c.meta;
-    } else {
-      TURNOS_VALIDOS.forEach(function(t){
-        var r = obtenerRegistro(fechaRef, t, false);
-        var c2 = calcularAcumuladoRegistro(r);
-        totalArmado += c2.armado; totalCargado += c2.cargado; meta += c2.meta;
-      });
-    }
-
-    var pctArmado = meta > 0 ? Math.round((totalArmado/meta)*100) : 0;
-    var pctCargado = meta > 0 ? Math.round((totalCargado/meta)*100) : 0;
-
-    document.getElementById("ini-total-armado").textContent = totalArmado + " / " + meta;
-    document.getElementById("ini-pct-armado").textContent = pctArmado + "%";
-    document.getElementById("ini-total-cargado").textContent = totalCargado + " / " + meta;
-    document.getElementById("ini-pct-cargado").textContent = pctCargado + "%";
-    document.getElementById("filtro-inicio-label").textContent = "Mostrando: " + etiquetaCortaTurno(filtroInicioActual === "todos" ? null : filtroInicioActual);
-
-    dibujarGraficoInicio(pctArmado, pctCargado);
-    verificarAlarma();
-  }
-
-  document.getElementById("filtro-inicio").querySelectorAll(".filtro-btn").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      filtroInicioActual = btn.getAttribute("data-filtro");
-      document.getElementById("filtro-inicio").querySelectorAll(".filtro-btn").forEach(function(b){
-        b.classList.toggle("activo", b === btn);
-      });
-      actualizarDashboardInicio();
-    });
-  });
-
-  var _resizeTimer = null;
-  window.addEventListener("resize", function(){
-    clearTimeout(_resizeTimer);
-    _resizeTimer = setTimeout(function(){
-      if(estado && document.getElementById("vista-app").style.display !== "none"){ dibujarGrafico(); }
-      if(estado && document.getElementById("vista-login").style.display !== "none"){ actualizarDashboardInicio(); }
-    }, 150);
-  });
-
-  /* ============== ACTUALIZAR ============== */
-  document.getElementById("btn-actualizar").addEventListener("click", function(){
-    var reg = registroActual();
-    if(!reg) return;
-    guardarEstado();
-    dibujarGrafico();
-    renderHorasGrid();
-    guardarEnHistorico();
-    actualizarMensaje();
-    actualizarMensajeArmado();
-    actualizarDashboardInicio();
-    verificarAlarma();
-    toast("Hora " + reg.horas[horaSelIdx].hora + " actualizada");
-  });
-
-  /* ============== HISTORICO (solo Backus) ============== */
-  function guardarEnHistorico(){
-    calcularPorcentajes();
-    var reg = registroActual();
-    if(!reg) return;
-    var lista = cargarHistorico();
-    var h = reg.horas[horaSelIdx];
-    var pct = reg.transportesProgramados > 0 ? (h.acumCargado||0)/reg.transportesProgramados : 0;
-
-    var registro = {
-      ts: Date.now(),
-      fecha: estado.fecha,
-      hora: h.hora,
-      turno: estado.turno,
-      supervisor: estado.nombreBackus,
-      encargadoArmado: estado.nombreLavoro,
-      subarea: estado.subarea,
-      area: estado.area,
-      transportesProgramados: reg.transportesProgramados,
-      armado: h.armado||0,
-      cargado: h.cargado||0,
-      acumArmado: h.acumArmado||0,
-      acumCargado: h.acumCargado||0,
-      pct: pct
-    };
-
-    // Clave unica de registro historico: fecha + turno + hora, para que
-    // dos turnos distintos con la misma hora del dia NUNCA se pisen.
-    var idx = lista.findIndex(function(r){
-      return String(r.fecha).trim() === String(estado.fecha).trim() &&
-             String(r.turno||"").trim() === String(estado.turno||"").trim() &&
-             String(r.hora).trim() === String(h.hora).trim();
-    });
-    if(idx >= 0) lista[idx] = registro; else lista.push(registro);
-
-    lista.sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
-    guardarHistorico(lista);
-    renderHistorico();
-  }
-
-  function renderHistorico(){
-    var cont = document.getElementById("hist-lista");
-    var lista = cargarHistorico();
-    cont.innerHTML = "";
-    if(!lista.length){
-      cont.innerHTML = '<div class="hist-empty">A&uacute;n no hay registros guardados.</div>';
-      return;
-    }
-    lista.slice(0, 60).forEach(function(r){
-      var pct = Math.round((r.pct||0)*100);
-      var color = pct>=90 ? "var(--verde)" : (pct>=50 ? "var(--amber)" : "var(--rojo)");
-      var cargadoMostrar = (r.acumCargado!==undefined ? r.acumCargado : r.cargado)||0;
-      var item = document.createElement("div");
-      item.className = "hist-item";
-      item.innerHTML =
-        '<span class="hist-fecha">'+escapeAttr(r.fecha||"-")+'<br>'+escapeAttr(r.hora||"-")+'</span>'+
-        '<span class="hist-info">'+escapeAttr(nombreCortoTurno(r.turno))+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
-        '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
-      item.addEventListener("click", function(){
-        if(!r.turno || r.turno !== estado.turno){
-          toast("Ese registro es de otro turno (" + nombreCortoTurno(r.turno) + "). Ingresa a ese turno para editarlo.");
-          return;
-        }
-        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" ("+nombreCortoTurno(r.turno)+") al editor?")){
-          var reg = registroActual();
-          var idx = reg.horas.findIndex(function(h){ return h.hora === r.hora; });
-          if(idx >= 0){
-            reg.horas[idx].armado = r.armado;
-            reg.horas[idx].cargado = r.cargado;
-            horaSelIdx = idx;
-            guardarEstado();
-            render();
-            toast("Datos de "+r.hora+" cargados");
-          }
-        }
-      });
-      cont.appendChild(item);
-    });
-  }
-
-  /* ============== PLAN DE ACCION / ALARMA DE CUMPLIMIENTO ============== */
-  /* Corre siempre (desde el arranque de la app), independiente de si hay
-     alguien con sesion iniciada, para que la alerta se vea/suene tambien
-     en la pantalla inicial. La logica de corte horario no cambia, y
-     siempre evalua el turno actualmente activo en la sesion. */
-  var alarmaActiva = false;
-  var alarmaSonidoId = null;
-  var monitorAlarmaId = null;
-
-  // Minutos transcurridos desde el inicio del turno hasta AHORA,
-  // manejando el cruce de medianoche (ej. turno nocturno).
-  function minutosDesdeInicioTurno(){
-    if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var ahora = new Date();
-    var actualMin = ahora.getHours()*60 + ahora.getMinutes();
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
-    var diff = actualMin - inicioMin;
-    if(diff < 0) diff += 24*60;
-    return diff;
-  }
-
-  // Minutos desde el inicio del turno hasta su hora de corte, manejando
-  // el cruce de medianoche.
-  function minutosDesdeInicioHastaCorte(){
-    if(!estado || !TURNO_CORTE[estado.turno] || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var corte = TURNO_CORTE[estado.turno];
-    var corteMin = corte.h*60 + corte.m;
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
-    var diff = corteMin - inicioMin;
-    if(diff < 0) diff += 24*60;
-    return diff;
-  }
-
-  function horaDeCortePasada(){
-    var transcurrido = minutosDesdeInicioTurno();
-    var hastaCorte = minutosDesdeInicioHastaCorte();
-    if(transcurrido === null || hastaCorte === null) return false;
-    // Margen de 1 hora despues del fin del turno (8h = 480min) para no
-    // arrastrar una alarma "vieja" de un turno anterior.
-    if(transcurrido > 480 + 60) return false;
-    return transcurrido >= hastaCorte;
-  }
-
-  function pctCumplimientoActual(){
-    if(!estado || !estado.turno) return 0;
-    calcularPorcentajes();
-    var reg = registroActual();
-    if(!reg || !reg.horas.length) return 0;
-    return reg.horas[reg.horas.length-1].pct || 0;
-  }
-
-  function reproducirBeep(){
-    try{
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      if(!Ctx) return;
-      if(!reproducirBeep._ctx) reproducirBeep._ctx = new Ctx();
-      var ctx = reproducirBeep._ctx;
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.type = "square";
-      osc.frequency.value = 880;
-      gain.gain.value = 0.16;
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start();
-      setTimeout(function(){ try{ osc.stop(); }catch(e){} }, 240);
-    }catch(e){}
-  }
-
-  // Caja DENTRO de la app (ABInBev / c-plan-accion): siempre refleja el
-  // turno REAL de la sesion activa (estado.turno) y la alarma real.
-  function actualizarPlanAccionApp(){
-    var caja = document.getElementById("c-plan-accion");
-    if(!caja) return;
-    if(alarmaActiva){
-      caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
-      caja.classList.add("alerta");
-    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
-      var corte = TURNO_CORTE[estado.turno];
-      var hh = String(corte.h).padStart(2,"0");
-      var mm = String(corte.m).padStart(2,"0");
-      caja.value = "OK \u00b7 corte " + hh + ":" + mm;
-      caja.classList.remove("alerta");
-    } else {
-      caja.value = "-";
-      caja.classList.remove("alerta");
-    }
-  }
-
-  // Caja de la PANTALLA PRINCIPAL (#alerta-inicio): sigue el filtro que
-  // el usuario elige ah\u00ed mismo (Ma\u00f1ana/Tarde/Noche/TODOS), NO el
-  // turno de la sesion activa. Por eso, al hacer click en un filtro,
-  // ahora si se actualiza con la hora de corte REAL de ese turno.
-  function actualizarAlertaInicio(){
-    var caja = document.getElementById("alerta-inicio");
-    if(!caja) return;
-    var turnoVisto = (filtroInicioActual !== "todos") ? filtroInicioActual : null;
-    if(!turnoVisto){
-      // "TODOS" combina 3 turnos, cada uno con su propia hora de corte,
-      // asi que no hay una sola hora de corte que mostrar aqui.
-      caja.textContent = "-";
-      caja.classList.remove("alerta");
-      return;
-    }
-    var esElTurnoConAlarma = alarmaActiva && estado && estado.turno === turnoVisto;
-    if(esElTurnoConAlarma){
-      caja.textContent = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
-      caja.classList.add("alerta");
-    } else if(TURNO_CORTE[turnoVisto]){
-      var corte = TURNO_CORTE[turnoVisto];
-      var hh = String(corte.h).padStart(2,"0");
-      var mm = String(corte.m).padStart(2,"0");
-      caja.textContent = "OK \u00b7 corte " + hh + ":" + mm;
-      caja.classList.remove("alerta");
-    } else {
-      caja.textContent = "-";
-      caja.classList.remove("alerta");
-    }
-  }
-
-  function actualizarUIPlanAccion(){
-    actualizarPlanAccionApp();
-    actualizarAlertaInicio();
-  }
-
-  function dispararAlarma(){
-    if(alarmaActiva) return;
-    alarmaActiva = true;
-    if(alarmaSonidoId) clearInterval(alarmaSonidoId);
-    reproducirBeep();
-    alarmaSonidoId = setInterval(reproducirBeep, 1500);
-    actualizarUIPlanAccion();
-    toast("\u26A0 No se alcanz\u00f3 el 50% a la hora de corte. Activa el Plan de Acci\u00f3n.");
-  }
-
-  function silenciarAlarma(sinAviso){
-    alarmaActiva = false;
-    if(alarmaSonidoId){ clearInterval(alarmaSonidoId); alarmaSonidoId = null; }
-    actualizarUIPlanAccion();
-    if(!sinAviso) toast("Alarma silenciada");
-  }
-
-  function verificarAlarma(){
-    if(!estado || !estado.turno) { actualizarUIPlanAccion(); return; }
-    if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){
-      dispararAlarma();
-    } else {
-      actualizarUIPlanAccion();
-    }
-  }
-
-  function iniciarMonitorAlarma(){
-    if(monitorAlarmaId) clearInterval(monitorAlarmaId);
-    verificarAlarma();
-    monitorAlarmaId = setInterval(verificarAlarma, 20000);
-  }
-
-  document.querySelectorAll(".plan-accion-display").forEach(function(el){
-    el.addEventListener("click", function(){
-      if(this.classList.contains("alerta")){ silenciarAlarma(false); }
-    });
-  });
-
-  /* ============== SORTING: RELOJ EN TIEMPO REAL ============== */
-  function actualizarRelojSorting(){
-    var el = document.getElementById("sorting-reloj");
-    if(!el) return;
-    var d = new Date();
-    var dd = String(d.getDate()).padStart(2,"0");
-    var mm = String(d.getMonth()+1).padStart(2,"0");
-    var yy = d.getFullYear();
-    var hh = String(d.getHours()).padStart(2,"0");
-    var mi = String(d.getMinutes()).padStart(2,"0");
-    var ss = String(d.getSeconds()).padStart(2,"0");
-    el.textContent = dd + "/" + mm + "/" + yy + " \u00b7 " + hh + ":" + mi + ":" + ss;
-  }
-
-  /* ============== SORTING: LISTA DE BLOQUES ============== */
-  // Construye la lista completa de bloques (checkbox + input de cajas).
-  // Se llama una vez por sesion/render; los cambios puntuales (marcar,
-  // escribir cajas) actualizan el DOM existente sin reconstruir todo,
-  // para no perder el foco mientras el usuario escribe.
-  function renderBloques(){
-    var reg = registroSortingActual();
-    var cont = document.getElementById("bloques-lista");
-    if(!reg || !cont) return;
-    cont.innerHTML = "";
-    reg.bloques.forEach(function(b, i){
-      var atrasado = bloqueEstaAtrasado(b);
-      var detalle = [];
-      if(b.entregaVacia) detalle.push("Entrega [ ]");
-      else if(b.entrega) detalle.push("Entrega " + b.entrega);
-      if(b.nota) detalle.push(b.nota);
-      var fila = document.createElement("div");
-      fila.className = "bloque-item" + (atrasado ? " atrasado" : "");
-      fila.innerHTML =
-        '<label class="bloque-check">' +
-          '<input type="checkbox" class="bloque-chk" data-i="' + i + '"' + (b.marcado ? " checked" : "") + '>' +
-          '<span class="bloque-nombre">' + escapeAttr(b.nombre) +
-            (detalle.length ? ('<small>' + escapeAttr(detalle.join(" \u00b7 ")) + '</small>') : '') +
-          '</span>' +
-        '</label>' +
-        '<input type="text" inputmode="numeric" class="bloque-cajas" data-i="' + i + '" placeholder="Cajas" value="' + (b.cajas || 0) + '"' + (b.marcado ? "" : " disabled") + '>';
-      cont.appendChild(fila);
-    });
-
-    cont.querySelectorAll(".bloque-chk").forEach(function(chk){
-      chk.addEventListener("change", function(){
-        var reg2 = registroSortingActual();
-        if(!reg2) return;
-        var i = Number(this.dataset.i);
-        reg2.bloques[i].marcado = this.checked;
-        guardarEstado();
-        var fila = this.closest(".bloque-item");
-        var inputCajas = fila ? fila.querySelector(".bloque-cajas") : null;
-        if(inputCajas) inputCajas.disabled = !this.checked;
-        if(fila) fila.classList.toggle("atrasado", bloqueEstaAtrasado(reg2.bloques[i]));
-        actualizarMetaSorting();
-        actualizarMensajeSorting();
-        verificarAlarmaSorting();
-      });
-    });
-
-    cont.querySelectorAll(".bloque-cajas").forEach(function(inp){
-      inp.addEventListener("input", function(){
-        var reg2 = registroSortingActual();
-        if(!reg2) return;
-        var i = Number(this.dataset.i);
-        var valor = Number(this.value.replace(/[^0-9]/g, "")) || 0;
-        if(valor > 30000){ valor = 30000; }
-        this.value = valor;
-        reg2.bloques[i].cajas = valor;
-        guardarEstado();
-        actualizarMetaSorting();
-        actualizarMensajeSorting();
-      });
-      inp.addEventListener("blur", function(){
-        var reg2 = registroSortingActual();
-        if(!reg2) return;
-        var i = Number(this.dataset.i);
-        var valor = Number(this.value) || 0;
-        if(valor > 0 && valor < 5000){
-          valor = 5000;
-          this.value = valor;
-          reg2.bloques[i].cajas = valor;
-          guardarEstado();
-          actualizarMetaSorting();
-          actualizarMensajeSorting();
-          toast("El m\u00ednimo permitido es 5,000 cajas.");
-        }
-      });
-    });
-  }
-
-  // Refresca SOLO el resaltado en rojo de "atrasado" en las filas ya
-  // pintadas, sin reconstruir los inputs (para no interrumpir si el
-  // usuario esta escribiendo en ese momento).
-  function actualizarAtrasoVisualBloques(){
-    var reg = registroSortingActual();
-    var cont = document.getElementById("bloques-lista");
-    if(!reg || !cont) return;
-    var filas = cont.querySelectorAll(".bloque-item");
-    filas.forEach(function(fila, i){
-      if(!reg.bloques[i]) return;
-      fila.classList.toggle("atrasado", bloqueEstaAtrasado(reg.bloques[i]));
-    });
-  }
-
-  /* ============== SORTING: AVANCE DE META DIARIA ============== */
-  function actualizarMetaSorting(){
-    var reg = registroSortingActual();
-    if(!reg) return;
-    var total = 0;
-    reg.bloques.forEach(function(b){ if(b.marcado) total += (b.cajas || 0); });
-    var tag = document.getElementById("sorting-meta-tag");
-    if(tag) tag.textContent = total.toLocaleString("es-PE") + " / " + META_SORTING.toLocaleString("es-PE");
-    var barra = document.getElementById("sorting-meta-barra");
-    if(barra){
-      var pct = Math.max(0, Math.min(100, (total / META_SORTING) * 100));
-      barra.style.width = pct + "%";
-      barra.classList.toggle("completa", total >= META_SORTING);
-    }
-    return total;
-  }
-
-  /* ============== SORTING: FUERZA LABORAL ============== */
-  function bindFuerzaLaboral(){
-    var reg = registroSortingActual();
-    if(!reg) return;
-    var elFijo = document.getElementById("sorting-personal-fijo");
-    var elRefuerzo = document.getElementById("sorting-personal-refuerzo");
-    var elApoyo = document.getElementById("sorting-apoyo-validacion");
-    elFijo.value = reg.personalFijo;
-    elRefuerzo.value = reg.personalRefuerzo;
-    elApoyo.checked = !!reg.apoyoValidacion;
-    actualizarTotalPersonalSorting();
-
-    elFijo.oninput = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.personalFijo = Number(this.value) || 0;
-      guardarEstado();
-      actualizarTotalPersonalSorting();
-      actualizarMensajeSorting();
-    };
-    elRefuerzo.oninput = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.personalRefuerzo = Number(this.value) || 0;
-      guardarEstado();
-      actualizarTotalPersonalSorting();
-      actualizarMensajeSorting();
-    };
-    elApoyo.onchange = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.apoyoValidacion = this.checked;
-      guardarEstado();
-      actualizarMensajeSorting();
-    };
-  }
-
-  function actualizarTotalPersonalSorting(){
-    var reg = registroSortingActual();
-    if(!reg) return;
-    var total = (reg.personalFijo || 0) + (reg.personalRefuerzo || 0);
-    var el = document.getElementById("sorting-total-personal");
-    if(el) el.textContent = "Total Personal: " + total + " personas";
-    return total;
-  }
-
-  /* ============== SORTING: MENSAJE DE ESTATUS / WHATSAPP ============== */
-  function generarMensajeSorting(){
-    var reg = registroSortingActual();
-    if(!reg) return "";
-    var ahora = new Date();
-    var hhmmss = String(ahora.getHours()).padStart(2,"0") + ":" + String(ahora.getMinutes()).padStart(2,"0") + ":" + String(ahora.getSeconds()).padStart(2,"0");
-    var totalPersonal = (reg.personalFijo||0) + (reg.personalRefuerzo||0);
-    var totalCajas = 0;
-
-    var lineas = [];
-    lineas.push("*REPORTE DE BLOQUES - SORTING*");
-    lineas.push("Turno: " + nombreCortoTurno(estado.turno));
-    lineas.push("Encargado: " + (estado.nombreSorting || "-"));
-    lineas.push("Fecha: " + (estado.fecha || "-"));
-    lineas.push("Hora de Env\u00edo: " + hhmmss);
-    lineas.push("");
-    lineas.push("*BLOQUES ENTREGADOS:*");
-    reg.bloques.forEach(function(b){
-      if(b.marcado) totalCajas += (b.cajas || 0);
-      var check = b.marcado ? "\u2611" : "\u2610";
-      var partes = [check + " " + b.nombre];
-      if(b.entregaVacia) partes.push("[ ]");
-      else if(b.entrega) partes.push(b.entrega);
-      partes.push((b.cajas || 0) + " Cajas");
-      if(b.nota) partes.push(b.nota);
-      var linea = partes.join(" - ");
-      if(bloqueEstaAtrasado(b)) linea += " [\u26A0 ATRASADO]";
-      lineas.push(linea);
-    });
-    lineas.push("");
-    lineas.push("*TOTAL DEL TURNO:* " + totalCajas + " / " + META_SORTING + " Cajas");
-    lineas.push("*FUERZA LABORAL:*");
-    lineas.push("- Personal Fijo: " + (reg.personalFijo||0) + " personas");
-    lineas.push("- Personal Refuerzo: " + (reg.personalRefuerzo||0) + " personas");
-    lineas.push("- Total Personal en Turno: " + totalPersonal + " personas");
-    lineas.push("- Apoyo con Validaci\u00f3n: " + (reg.apoyoValidacion ? "SI" : "NO"));
-    lineas.push("");
-    lineas.push("Por favor confirmar recepci\u00f3n.");
-    return lineas.join("\n");
-  }
-
-  function actualizarMensajeSorting(){
-    var el = document.getElementById("mensaje-texto-sorting");
-    if(el) el.textContent = generarMensajeSorting();
-  }
-
-  document.getElementById("btn-estatus-sorting").addEventListener("click", function(){
-    var panel = document.getElementById("panel-mensaje-sorting");
-    actualizarMensajeSorting();
-    panel.classList.toggle("open");
-  });
-  document.getElementById("btn-copiar-msg-sorting").addEventListener("click", function(){
-    copiarTexto(generarMensajeSorting());
-  });
-  document.getElementById("btn-whatsapp-msg-sorting").addEventListener("click", function(){
-    var mensaje = generarMensajeSorting();
-    enviarPorWhatsapp(mensaje);
-    var reg = registroSortingActual();
-    var totalCajas = 0;
-    (reg ? reg.bloques : []).forEach(function(b){ if(b.marcado) totalCajas += (b.cajas || 0); });
-    var ahora = new Date();
-    var horaActual = String(ahora.getHours()).padStart(2,"0") + ":" + String(ahora.getMinutes()).padStart(2,"0") + ":" + String(ahora.getSeconds()).padStart(2,"0");
-    var eficiencia = Math.round((totalCajas / META_SORTING) * 100);
-    enviarReporteStatus({
-      hora_reporte: horaActual,
-      armados_meta: META_SORTING,
-      cargados_meta: META_SORTING,
-      armados_hoy: totalCajas,
-      cargados_hoy: totalCajas,
-      eficiencia: eficiencia
-    }, mensaje);
-  });
-
-  /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ==============
-     Independiente de la alarma de armado/cargado de ABInBev. Si algun
-     bloque con hora de corte no esta marcado y ya paso su hora, suena
-     una alerta y ese bloque se resalta en rojo. */
-  var alarmaSortingActiva = false;
-  var alarmaSortingSonidoId = null;
-  var monitorAlarmaSortingId = null;
-
-  function dispararAlarmaSorting(){
-    if(alarmaSortingActiva) return;
-    alarmaSortingActiva = true;
-    if(alarmaSortingSonidoId) clearInterval(alarmaSortingSonidoId);
-    reproducirBeep();
-    alarmaSortingSonidoId = setInterval(reproducirBeep, 1500);
-    toast("\u26A0 Hay bloques atrasados sin marcar.");
-  }
-
-  function detenerAlarmaSorting(){
-    alarmaSortingActiva = false;
-    if(alarmaSortingSonidoId){ clearInterval(alarmaSortingSonidoId); alarmaSortingSonidoId = null; }
-  }
-
-  function verificarAlarmaSorting(){
-    if(rolActual !== "sorting" || !estado || !estado.turno){ detenerAlarmaSorting(); return; }
-    var reg = registroSortingActual();
-    if(!reg){ detenerAlarmaSorting(); return; }
-    var hayAtraso = reg.bloques.some(function(b){ return bloqueEstaAtrasado(b); });
-    if(hayAtraso) dispararAlarmaSorting(); else detenerAlarmaSorting();
-    actualizarAtrasoVisualBloques();
-  }
-
-  function iniciarMonitorAlarmaSorting(){
-    if(monitorAlarmaSortingId) clearInterval(monitorAlarmaSortingId);
-    monitorAlarmaSortingId = setInterval(verificarAlarmaSorting, 20000);
-  }
-
-  /* ============== SORTING: RENDER PRINCIPAL ============== */
-  function renderSorting(){
-    var reg = registroSortingActual();
-    if(!reg) return;
-    actualizarRelojSorting();
-    renderBloques();
-    bindFuerzaLaboral();
-    actualizarMetaSorting();
-    actualizarMensajeSorting();
-    verificarAlarmaSorting();
-  }
-
-  /* ============== COLAPSABLES ============== */
-  document.querySelectorAll(".collapsible-head").forEach(function(head){
-    head.addEventListener("click", function(){
-      var body = document.getElementById(head.dataset.target);
-      var chev = head.querySelector(".chev");
-      body.classList.toggle("open");
-      if(chev) chev.classList.toggle("open");
-    });
-  });
-
-  /* ============== RENDER GENERAL ============== */
-  function render(){
-    if(rolActual === "sorting"){
-      renderSorting();
-      return;
-    }
-    bindCabecera();
-    bindInfoLavoro();
-    renderHorasGrid();
-    bindDatosHora();
-    renderPlanes();
-    dibujarGrafico();
-    renderHistorico();
-    actualizarMensaje();
-    actualizarMensajeArmado();
-    verificarAlarma();
-  }
-
-  /* ============== INICIO ============== */
-  window.addEventListener("DOMContentLoaded", function(){
-    cargarEstado();
-    iniciarMonitorAlarma();
-    iniciarMonitorAlarmaSorting();
-    actualizarRelojSorting();
-    setInterval(actualizarRelojSorting, 1000);
-    actualizarDashboardInicio();
-    setInterval(actualizarDashboardInicio, 8000);
-
-    var sesion = leerSesion(SESSION_KEY);
-    if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
-      mostrarApp(sesion);
-    }
-
-    // Sincronizacion con Google Sheets: carga inicial + refresco cada 10s.
-    cargarDeNube();
-    setInterval(cargarDeNube, 10000);
-  });
-
-})();
-</script>
-  /* ===================================================================
-   SIC DIGITAL - FRONTEND (app.js)
-   Backend: Google Apps Script + Google Sheets | Zona: America/Lima
-=================================================================== */
-
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0635f-c9aodxWPHyaUxU03zAXdK9dQQnyNK5_z2pVCDJAPsfuJ6QeksjNAddO0YgW/exec';
-
-let turnoActual = localStorage.getItem('sic_turnoActual') || 'MAÑANA';
-let usuarioActual = localStorage.getItem('sic_usuarioActual') || '';
-
-window.datosBackus = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
-window.datosExterno = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
-window.datosBloques = { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
-window.totalesHistoricos = { totales: { armados: 0, cargados: 0, registros: 0 }, porTurno: {} };
-
-let intervaloCargarDatos = null;
-let intervaloCargarTotales = null;
-
-function fechaHoyISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+/* ===================== SIC DIGITAL - app.js (embebido) ===================== */
+
+var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbynReWRjGjUrNzfI_5jh7VlolCrkMyrPO3ebCpl58gQo5tEU12_jj6eL6XWVWmsu3Qt/exec";
+
+var turnoActual = "MAÑANA";
+var usuarioActual = "";
+
+/* ===================== FECHA LIMA ===================== */
+function fechaHoyLima() {
+  var ahora = new Date();
+  var opciones = { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" };
+  var partes = new Intl.DateTimeFormat("en-CA", opciones).formatToParts(ahora);
+  var map = {};
+  partes.forEach(function (p) { map[p.type] = p.value; });
+  return map.year + "-" + map.month + "-" + map.day;
 }
 
-function setTurnoActual(turno) {
-  turnoActual = turno;
-  localStorage.setItem('sic_turnoActual', turno);
-  cargarDatos();
-}
-
-function setUsuarioActual(usuario) {
-  usuarioActual = usuario;
-  localStorage.setItem('sic_usuarioActual', usuario);
-}
-
-function emitirEvento(nombre, detalle) {
-  document.dispatchEvent(new CustomEvent(nombre, { detail: detalle }));
-}
-
-async function obtenerHoja(hoja) {
-  const url = `${SCRIPT_URL}?hoja=${encodeURIComponent(hoja)}&turno=${encodeURIComponent(turnoActual)}&fecha=${encodeURIComponent(fechaHoyISO())}`;
-  try {
-    const resp = await fetch(url, { method: 'GET' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
-    return json.data || { armados: 0, cargados: 0, cumplimiento: 0, supervisor: '', pla: '', estado: 'ABIERTO' };
-  } catch (err) {
-    console.error(`No se pudo leer ${hoja} desde la nube:`, err);
-    return null;
-  }
-}
-
-async function cargarDatos() {
-  const [backus, externo, bloques] = await Promise.all([
-    obtenerHoja('BACKUS'),
-    obtenerHoja('EXTERNO'),
-    obtenerHoja('BLOQUES')
-  ]);
-
-  if (backus) window.datosBackus = backus;
-  if (externo) window.datosExterno = externo;
-  if (bloques) window.datosBloques = bloques;
-
-  emitirEvento('sic:datosActualizados', {
-    backus: window.datosBackus,
-    externo: window.datosExterno,
-    bloques: window.datosBloques,
-    turno: turnoActual
+/* ===================== CARGA DE DATOS (tiempo real) ===================== */
+function cargarDatos() {
+  var fecha = fechaHoyLima();
+  ["BACKUS", "EXTERNO", "BLOQUES"].forEach(function (hoja) {
+    var url = SCRIPT_URL + "?hoja=" + hoja + "&turno=" + encodeURIComponent(turnoActual) + "&fecha=" + fecha;
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) { pintarHoja(hoja, data); })
+      .catch(function (err) { console.error("Error cargando " + hoja + ":", err); });
   });
-
-  if (typeof renderizarUI === 'function') renderizarUI();
 }
 
-async function cargarTotales() {
-  const url = `${SCRIPT_URL}?tipo=totales`;
-  try {
-    const resp = await fetch(url, { method: 'GET' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
-    window.totalesHistoricos = { totales: json.totales, porTurno: json.porTurno };
-    emitirEvento('sic:totalesActualizados', window.totalesHistoricos);
-    if (typeof renderizarTotales === 'function') renderizarTotales();
-  } catch (err) {
-    console.error('No se pudo leer el historico de totales:', err);
-  }
+function pintarHoja(hoja, data) {
+  if (!data || data.error) return;
+  var prefijo = hoja.toLowerCase();
+  setTexto("armados-" + prefijo, data.armados || 0);
+  setTexto("cargados-" + prefijo, data.cargados || 0);
+  setTexto("cumplimiento-" + prefijo, (data.cumplimiento || 0) + "%");
+  setTexto("supervisor-" + prefijo, data.supervisor || "-");
+  setTexto("pla-" + prefijo, data.pla || "-");
+  setTexto("estado-" + prefijo, data.estado || "ACTIVO");
 }
 
-async function enviarCambio(hoja, tipoCambio) {
-  const cuerpo = Object.assign({
-    tipo: 'actualizacion',
-    hoja: hoja,
-    turno: turnoActual,
-    usuario: usuarioActual,
-    supervisor: usuarioActual
-  }, tipoCambio);
-
-  try {
-    const resp = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(cuerpo)
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
-    return json;
-  } catch (err) {
-    console.error(`No se pudo guardar el cambio en ${hoja}:`, err);
-    return null;
-  }
+function setTexto(id, valor) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = valor;
 }
 
-async function hacerReset() {
-  if (usuarioActual !== 'BACKUS') {
-    alert('Solo el usuario BACKUS puede finalizar un turno.');
+/* ===================== TOTALES HISTORICOS ===================== */
+function cargarTotales() {
+  fetch(SCRIPT_URL + "?tipo=totales")
+    .then(function (r) { return r.json(); })
+    .then(function (data) { pintarTotales(data); })
+    .catch(function (err) { console.error("Error cargando totales:", err); });
+}
+
+function pintarTotales(data) {
+  if (!data || data.error) return;
+  setTexto("total-armados-hist", data.armados || 0);
+  setTexto("total-cargados-hist", data.cargados || 0);
+  setTexto("total-registros-hist", data.registros || 0);
+  ["MAÑANA", "TARDE", "NOCHE"].forEach(function (t) {
+    var d = (data.porTurno && data.porTurno[t]) || { armados: 0, cargados: 0 };
+    setTexto("total-armados-" + t, d.armados);
+    setTexto("total-cargados-" + t, d.cargados);
+  });
+}
+
+/* ===================== ENVIO DE CAMBIOS ===================== */
+function enviarCambio(hoja, tipoCambio) {
+  var prefijo = hoja.toLowerCase();
+  var elValor = document.getElementById(tipoCambio + "-" + prefijo);
+  var actual = elValor ? (Number(elValor.textContent) || 0) : 0;
+  var nuevoValor = actual + 1;
+
+  var cuerpo = { tipo: "actualizacion", hoja: hoja, turno: turnoActual, usuario: usuarioActual };
+  cuerpo[tipoCambio] = nuevoValor;
+
+  var elUsuario = document.getElementById("input-usuario");
+  if (elUsuario) cuerpo.supervisor = elUsuario.value || usuarioActual;
+
+  var elPla = document.getElementById("input-pla");
+  if (elPla) cuerpo.pla = elPla.value || "";
+
+  if (elValor) elValor.textContent = nuevoValor; // actualizacion optimista local
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(cuerpo)
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (resp) {
+      if (!resp || resp.success !== true) console.error("No se pudo guardar:", resp && resp.error);
+      cargarDatos();
+    })
+    .catch(function (err) { console.error("Error enviando cambio:", err); });
+}
+
+/* ===================== RESET DE TURNO (solo BACKUS) ===================== */
+function hacerReset() {
+  if (usuarioActual !== "BACKUS") {
+    alert("Solo BACKUS puede finalizar el turno.");
     return;
   }
-  const confirmado = confirm(`¿Finalizar turno ${turnoActual}?`);
+  var confirmado = confirm("¿Finalizar turno " + turnoActual + "? Se guardará el registro final y los contadores volverán a 0.");
   if (!confirmado) return;
 
-  try {
-    const resp = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ tipo: 'reset', turno: turnoActual, usuario: usuarioActual })
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ tipo: "reset", turno: turnoActual, usuario: usuarioActual })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (resp) {
+      if (resp && resp.success) {
+        alert("Turno " + turnoActual + " finalizado y guardado en el histórico.");
+      } else {
+        alert("No se pudo finalizar el turno: " + (resp && resp.error));
+      }
+      cargarDatos();
+      cargarTotales();
+    })
+    .catch(function (err) {
+      console.error("Error en reset:", err);
+      alert("Error de conexión al finalizar el turno.");
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (!json || json.success !== true) throw new Error((json && json.error) || 'Respuesta invalida del servidor');
-    await cargarDatos();
-    emitirEvento('sic:turnoFinalizado', { turno: turnoActual });
-  } catch (err) {
-    console.error('No se pudo finalizar el turno:', err);
-    alert('No se pudo finalizar el turno. Revisa tu conexion e intenta de nuevo.');
-  }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+/* ===================== CAMBIO DE TURNO / ROL ===================== */
+function cambiarTurno(nuevoTurno) {
+  turnoActual = nuevoTurno;
+  cargarDatos();
+}
+
+function actualizarVisibilidadReset() {
+  var btn = document.getElementById("btn-reset");
+  btn.style.display = (usuarioActual === "BACKUS") ? "block" : "none";
+}
+
+document.getElementById("sel-turno").addEventListener("change", function () {
+  cambiarTurno(this.value);
+});
+
+document.getElementById("sel-rol").addEventListener("change", function () {
+  usuarioActual = this.value;
+  actualizarVisibilidadReset();
+});
+
+document.getElementById("btn-reset").addEventListener("click", hacerReset);
+
+/* ===================== INICIO ===================== */
+document.addEventListener("DOMContentLoaded", function () {
   cargarDatos();
   cargarTotales();
-  intervaloCargarDatos = setInterval(cargarDatos, 10000);
-  intervaloCargarTotales = setInterval(cargarTotales, 60000);
+  setInterval(cargarDatos, 10000);
+  setInterval(cargarTotales, 60000);
 });
-</script>  
+</script>
+
 </body>
 </html>
