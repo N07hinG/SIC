@@ -408,6 +408,7 @@
         <span class="marca-ab">AB InBev</span>
         <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
       </div>
+      <div class="sorting-reloj" id="reloj-backus" style="margin-bottom:14px;">--/--/---- &middot; --:--:--</div>
       <div class="grid2">
         <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
         <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
@@ -439,6 +440,7 @@
 
     <!-- Info simple + estatus (solo Lavoro) -->
     <section class="panel solo-lavoro">
+      <div class="sorting-reloj" id="reloj-lavoro" style="margin-bottom:14px;">--/--/---- &middot; --:--:--</div>
       <div class="info-lavoro">
         <div class="caja"><label>TURNO</label><span id="lv-turno">-</span></div>
         <div class="caja"><label>FECHA</label><span id="lv-fecha">-</span></div>
@@ -695,12 +697,11 @@
 
   function bloquesSortingPorDefecto(){
     return [
-      { id:1, nombre:"Bloque 1", entrega:"10:00am", entregaVacia:false, nota:"Lo usa T1", corteH:10, corteM:0,  marcado:false, cajas:0 },
-      { id:2, nombre:"Bloque 2", entrega:"1:30pm",  entregaVacia:false, nota:"",          corteH:13, corteM:30, marcado:false, cajas:0 },
-      { id:3, nombre:"Bloque 3", entrega:"3:45pm",  entregaVacia:false, nota:"",          corteH:15, corteM:45, marcado:false, cajas:0 },
-      { id:4, nombre:"Bloque 4", entrega:"",        entregaVacia:true,  nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:5, nombre:"Bloque 5", entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:6, nombre:"Fila 4",   entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 }
+      { id:1, nombre:"Bloque 4",     entrega:"10:00am", entregaVacia:false, nota:"", corteH:10, corteM:0,  marcado:false, cajas:0 },
+      { id:2, nombre:"Bloque 3",     entrega:"11:30am", entregaVacia:false, nota:"", corteH:11, corteM:30, marcado:false, cajas:0 },
+      { id:3, nombre:"Bloque 2",     entrega:"1:00pm",  entregaVacia:false, nota:"", corteH:13, corteM:0,  marcado:false, cajas:0 },
+      { id:4, nombre:"Bloque Extra", entrega:"3:00pm",  entregaVacia:false, nota:"", corteH:15, corteM:0,  marcado:false, cajas:0 },
+      { id:5, nombre:"Fila 4",       entrega:"",        entregaVacia:false, nota:"", corteH:null, corteM:null, marcado:false, cajas:0 }
     ];
   }
 
@@ -1849,10 +1850,9 @@
     });
   });
 
-  /* ============== SORTING: RELOJ EN TIEMPO REAL ============== */
+  /* ============== RELOJ EN TIEMPO REAL (Sorting, Backus y Lavoro) ============== */
+  var IDS_RELOJ = ["sorting-reloj", "reloj-backus", "reloj-lavoro"];
   function actualizarRelojSorting(){
-    var el = document.getElementById("sorting-reloj");
-    if(!el) return;
     var d = new Date();
     var dd = String(d.getDate()).padStart(2,"0");
     var mm = String(d.getMonth()+1).padStart(2,"0");
@@ -1860,7 +1860,11 @@
     var hh = String(d.getHours()).padStart(2,"0");
     var mi = String(d.getMinutes()).padStart(2,"0");
     var ss = String(d.getSeconds()).padStart(2,"0");
-    el.textContent = dd + "/" + mm + "/" + yy + " \u00b7 " + hh + ":" + mi + ":" + ss;
+    var texto = dd + "/" + mm + "/" + yy + " \u00b7 " + hh + ":" + mi + ":" + ss;
+    IDS_RELOJ.forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.textContent = texto;
+    });
   }
 
   /* ============== SORTING: LISTA DE BLOQUES ============== */
