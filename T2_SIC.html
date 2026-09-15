@@ -362,7 +362,7 @@
       </div>
       <div class="plan-accion-display" id="alerta-inicio" title="Toca para silenciar la alarma">-</div>
 
-      <!-- Formulario de ingreso unificado (se muestra tras elegir ABInBev o Externo) -->
+      <!-- Formulario de ingreso unificado (se muestra tras elegir ABInBev, Externo o Sorting) -->
       <div class="subform" id="form-login">
         <p class="login-seccion-titulo" id="form-login-titulo">Ingresar</p>
         <div class="campo">
@@ -420,7 +420,7 @@
       <div class="fila-transp">
         <div class="caja-transp">
           <label>TRANSPORTES PROGRAMADOS<span>(de este turno)</span></label>
-          <input id="c-transportes" class="num" inputmode="numeric" value="74">
+          <input id="c-transportes" class="num" inputmode="numeric" value="0">
         </div>
         <div class="caja-estatus" id="btn-estatus">
           <span class="led"></span>
@@ -480,10 +480,10 @@
     <section class="panel solo-sorting">
       <div class="panel-title small">Fuerza Laboral</div>
       <div class="grid2">
-        <div class="campo-mini"><label>Personal Fijo</label><input id="sorting-personal-fijo" inputmode="numeric" value="12"></div>
+        <div class="campo-mini"><label>Personal Fijo</label><input id="sorting-personal-fijo" inputmode="numeric" value="0"></div>
         <div class="campo-mini"><label>Personal Refuerzo</label><input id="sorting-personal-refuerzo" inputmode="numeric" value="0"></div>
       </div>
-      <div class="sorting-total-personal" id="sorting-total-personal">Total Personal: 12 personas</div>
+      <div class="sorting-total-personal" id="sorting-total-personal">Total Personal: 0 personas</div>
       <label class="sorting-check-row">
         <input type="checkbox" id="sorting-apoyo-validacion">
         <span>Apoyo con Validaci&oacute;n</span>
@@ -555,7 +555,7 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- ============== FIREBASE (sincronizacion en tiempo real entre dispositivos) ============== -->
+<!-- ============== FIREBASE (unica fuente de datos: todo en tiempo real, sin localStorage) ============== -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
@@ -563,10 +563,37 @@
 (function(){
   "use strict";
 
-  /* ============== CLAVES DE ALMACENAMIENTO ============== */
-  var SESSION_KEY = "t2sic_session"; // guarda el ROL activo: "backus" | "lavoro"
-  var DATA_KEY = "t2sic_data";
-  var HIST_KEY = "t2sic_historico";
+  /* ==================================================================
+     SIC DIGITAL - LOGICA DE DATOS 100% FIREBASE (Realtime Database)
+     --------------------------------------------------------------
+     - Nada de datos de la operacion se guarda en localStorage. La
+       unica fuente de verdad es Firebase: todo lo que un usuario
+       escribe se manda directo a la base de datos, y todo lo que se
+       muestra en pantalla viene de escuchar esa misma base de datos
+       en tiempo real (on("value", ...)). Cualquier persona que abra
+       el link ve, al instante, exactamente lo mismo que las demas.
+     - Lo unico que vive fuera de Firebase es la SESION de este
+       dispositivo (que rol eligi\u00f3, que turno y que nombre escribio al
+       ingresar). Eso es informacion de "quien soy en esta pesta\u00f1a",
+       no un dato del turno, por eso se queda en sessionStorage (se
+       borra solo al cerrar la pesta\u00f1a) y nunca se sube a la nube.
+     - Los datos de cada turno viven en Firebase bajo una ruta fija
+       por fecha+turno (estadoApp/datosPorTurno/{fecha}/{turno} y
+       estadoApp/sortingPorTurno/{fecha}/{turno}). Cuando alguien
+       ingresa por primera vez a un turno que no existe todavia, se
+       crea con TODO en cero mediante una transaccion (esto evita que
+       dos personas ingresando al mismo tiempo se pisen los datos).
+     - Las escrituras normales (armado, cargado, cajas, etc.) apuntan
+       directo al campo exacto que cambio (no se reescribe el objeto
+       completo), para que dos personas puedan trabajar en turnos
+       distintos (o incluso en el mismo) sin que el guardado de una
+       borre lo que la otra acaba de escribir.
+     - El Historico tambien vive en Firebase (estadoApp/historico) y
+       se sincroniza en tiempo real: no hace falta respaldo aparte,
+       ya que ademas cada envio por WhatsApp queda como respaldo.
+     ================================================================== */
+
+  var SESSION_KEY = "sic_sesion"; // SOLO sessionStorage: quien soy en esta pesta\u00f1a (no es un dato del turno)
 
   /* ============== BACKEND EN LA NUBE (Firebase Realtime Database) ============== */
   var firebaseConfig = {
@@ -579,33 +606,36 @@
     appId: "1:991908552863:web:baa166d5bd1be1767242aa"
   };
   var firebaseApp = null;
-  var dbEstadoRef = null;
-  try{
-    firebaseApp = firebase.initializeApp(firebaseConfig);
-    dbEstadoRef = firebase.database().ref("estadoApp");
-  }catch(e){
-    console.error("No se pudo inicializar Firebase (se sigue usando localStorage):", e);
+  var refConfig = null;        // estadoApp/config            -> subarea, fecha, area, monitoreo, planes (compartido)
+  var refDatosTurno = null;    // estadoApp/datosPorTurno      -> {fecha}/{turno}/{horas[], transportesProgramados}
+  var refSorting = null;       // estadoApp/sortingPorTurno    -> {fecha}/{turno}/{bloques[], personalFijo, ...}
+  var refHistorico = null;     // estadoApp/historico          -> {clave}: registro
+  var dbOK = false;
+
+  // Acceso seguro a subrutas: si Firebase no esta disponible (sin
+  // internet, o mientras carga), esto NUNCA lanza error - simplemente
+  // devuelve null, y escribir()/escribirConDebounce() ya saben ignorar
+  // un ref nulo. Asi la app entera (navegar, ver los 3 roles, graficos,
+  // horas de corte, etc.) funciona siempre al instante; Firebase solo
+  // entra a sincronizar los datos que el usuario va editando.
+  function hijo(refBase, path){
+    return refBase ? refBase.child(path) : null;
   }
 
-  var nubeGuardarTimeoutId = null;
-  var nubeGuardandoAhora = false;
-  var huboEdicionLocalPendiente = false;
+  try{
+    firebaseApp = firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
+    refConfig = db.ref("estadoApp/config");
+    refDatosTurno = db.ref("estadoApp/datosPorTurno");
+    refSorting = db.ref("estadoApp/sortingPorTurno");
+    refHistorico = db.ref("estadoApp/historico");
+    dbOK = true;
+  }catch(e){
+    console.error("No se pudo inicializar Firebase:", e);
+  }
 
   var TURNOS_VALIDOS = ["Turno 1 - Ma\u00f1ana","Turno 2 - Tarde","Turno 3 - Nocturno"];
-
-  /* ============== ALMACENAMIENTO SEGURO ============== */
-  var memoria = {}, memoriaSesion = {};
-  function guardarValor(key, val){ try{ localStorage.setItem(key, val); }catch(e){ memoria[key] = val; } }
-  function leerValor(key){ try{ return localStorage.getItem(key); }catch(e){ return (key in memoria) ? memoria[key] : null; } }
-  function guardarSesion(key, val){ try{ sessionStorage.setItem(key, val); }catch(e){ memoriaSesion[key] = val; } }
-  function leerSesion(key){ try{ return sessionStorage.getItem(key); }catch(e){ return (key in memoriaSesion) ? memoriaSesion[key] : null; } }
-  function borrarSesion(key){ try{ sessionStorage.removeItem(key); }catch(e){} delete memoriaSesion[key]; }
-
-  /* ============== ESTADO ============== */
-  var estado = null;
-  var horaSelIdx = 0;
-  var rolActual = null; // "backus" | "lavoro"
-  var filtroInicioActual = "todos"; // "todos" | uno de TURNOS_VALIDOS
+  var META_SORTING = 35000;
 
   var TURNO_INICIO = {
     "Turno 1 - Ma\u00f1ana": 7,   // 7:00 am a 3:00 pm
@@ -628,10 +658,10 @@
     return h12 + ":00 " + periodo;
   }
 
-  // Genera las horas de reporte del turno. La primera hora del turno es
-  // solo el ingreso (no se trabaja ni se reporta nada), por eso el
-  // reporte arranca 1 hora despues del inicio y termina en la hora de
-  // cierre del turno (8 horas de trabajo reportadas en total).
+  // Genera las horas de reporte del turno, todas en cero. La primera
+  // hora del turno es solo el ingreso (no se trabaja ni se reporta
+  // nada), por eso el reporte arranca 1 hora despues del inicio y
+  // termina en la hora de cierre del turno (8 horas reportadas).
   function generarHorasPorTurno(turno){
     var inicio = (turno && TURNO_INICIO.hasOwnProperty(turno)) ? TURNO_INICIO[turno] : TURNO_INICIO["Turno 3 - Nocturno"];
     var horas = [];
@@ -641,59 +671,34 @@
     return horas;
   }
 
-  /* ============== REGISTROS SEPARADOS POR FECHA + TURNO ==============
-     Cada turno (y cada fecha) tiene su PROPIO registro independiente:
-     { horas: [...], transportesProgramados: N }
-     Nunca se comparten ni se copian datos entre turnos. */
   function claveFecha(f){
     var s = String(f||"").trim();
     return s || "SIN_FECHA";
   }
 
-  // Crea (si crear=true) o consulta (si crear=false) el registro de un
-  // turno especifico en una fecha especifica. Si no existe y crear es
-  // false, devuelve un registro transitorio vacio (no se guarda nada,
-  // solo sirve para lectura/visualizacion).
-  function obtenerRegistro(fecha, turno, crear){
-    if(!estado.datosPorTurno) estado.datosPorTurno = {};
-    var fk = claveFecha(fecha);
-    if(crear){
-      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-      if(!estado.datosPorTurno[fk][turno]){
-        estado.datosPorTurno[fk][turno] = {
-          horas: generarHorasPorTurno(turno),
-          transportesProgramados: 74
-        };
-      }
-      return estado.datosPorTurno[fk][turno];
-    }
-    if(estado.datosPorTurno[fk] && estado.datosPorTurno[fk][turno]){
-      return estado.datosPorTurno[fk][turno];
-    }
-    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0 };
+  function claveSegura(s){
+    return String(s||"x").replace(/[.#$\[\]\/\s]/g, "-");
   }
 
-  // Registro del turno actualmente activo en la sesion (el que se esta
-  // editando ahora mismo). Se crea automaticamente si no existe todavia.
-  function registroActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistro(estado.fecha, estado.turno, true);
+  function fechaHoyStr(){
+    var d = new Date();
+    var dd = String(d.getDate()).padStart(2,"0");
+    var mm = String(d.getMonth()+1).padStart(2,"0");
+    var yy = d.getFullYear();
+    return dd+"/"+mm+"/"+yy;
   }
 
-  function calcularAcumuladoRegistro(reg){
-    var meta = (reg && reg.transportesProgramados) || 0;
-    var sumaArmado = 0, sumaCargado = 0;
-    ((reg && reg.horas) || []).forEach(function(h){
-      sumaArmado += (h.armado||0);
-      sumaCargado += (h.cargado||0);
-    });
-    return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
+  // Corrige fechas que hayan quedado guardadas en formato ISO
+  // (por ejemplo "2026-04-14T05:00:00.000Z", que aparece cuando en
+  // algun punto se guard\u00f3 un objeto Date en vez de un texto). Convierte
+  // ese formato a dd/mm/aaaa; cualquier otro texto se deja tal cual.
+  function formatearFechaVisible(raw){
+    var s = String(raw||"").trim();
+    if(!s) return "-";
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m){ return m[3] + "/" + m[2] + "/" + m[1]; }
+    return s;
   }
-
-  /* ============== DATOS DE SORTING (BLOQUES) - SEPARADOS POR TURNO+FECHA ==============
-     Estructura totalmente independiente de "datosPorTurno" (ABInBev/Externo).
-     Nunca se mezcla con los datos de armado/cargado. */
-  var META_SORTING = 35000;
 
   function bloquesSortingPorDefecto(){
     return [
@@ -705,33 +710,76 @@
     ];
   }
 
-  // Crea (crear=true) o consulta (crear=false) el registro de Sorting de
-  // un turno especifico en una fecha especifica. Igual que con los
-  // registros de ABInBev/Externo, nunca se comparte entre turnos.
-  function obtenerRegistroSorting(fecha, turno, crear){
-    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-    var fk = claveFecha(fecha);
-    if(crear){
-      if(!estado.sortingPorTurno[fk]) estado.sortingPorTurno[fk] = {};
-      if(!estado.sortingPorTurno[fk][turno]){
-        estado.sortingPorTurno[fk][turno] = {
-          bloques: bloquesSortingPorDefecto(),
-          personalFijo: 12,
-          personalRefuerzo: 0,
-          apoyoValidacion: false
-        };
-      }
-      return estado.sortingPorTurno[fk][turno];
-    }
-    if(estado.sortingPorTurno[fk] && estado.sortingPorTurno[fk][turno]){
-      return estado.sortingPorTurno[fk][turno];
-    }
-    return { bloques: bloquesSortingPorDefecto(), personalFijo:12, personalRefuerzo:0, apoyoValidacion:false };
+  function registroTurnoPorDefecto(turno){
+    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0 };
+  }
+  function registroSortingPorDefecto(){
+    return { bloques: bloquesSortingPorDefecto(), personalFijo: 0, personalRefuerzo: 0, apoyoValidacion: false };
+  }
+  function configPorDefecto(){
+    return {
+      subarea:"T2", fecha: fechaHoyStr(), area:"LOG",
+      monitoreo:"Unidades cargadas x horas planificadas",
+      planes:[
+        {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
+        {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
+        {n:3,accion:"Solicitar personal de carga de furgones para picking"},
+        {n:4,accion:""},
+        {n:5,accion:"Solicitar refuerzo con movilizador de otro turno"},
+        {n:6,accion:"Mantener"},
+        {n:7,accion:""},{n:8,accion:""},{n:9,accion:""},{n:10,accion:""}
+      ]
+    };
   }
 
+  /* ============== SESION LOCAL (solo esta pesta\u00f1a; no es un dato del turno) ============== */
+  var memoriaSesion = {};
+  function guardarSesion(val){ try{ sessionStorage.setItem(SESSION_KEY, JSON.stringify(val)); }catch(e){ memoriaSesion[SESSION_KEY] = val; } }
+  function leerSesion(){
+    try{
+      var raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return memoriaSesion[SESSION_KEY] || null; }
+  }
+  function borrarSesion(){ try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){} delete memoriaSesion[SESSION_KEY]; }
+
+  var sesion = { rol:null, turno:null, nombre:null };
+
+  /* ============== CACHES EN MEMORIA (siempre reflejo de Firebase) ============== */
+  var configCache = configPorDefecto();
+  var datosPorTurnoCache = {};   // { [fecha]: { [turno]: {horas, transportesProgramados} } }
+  var sortingPorTurnoCache = {}; // { [fecha]: { [turno]: {bloques, personalFijo, personalRefuerzo, apoyoValidacion} } }
+  var historicoCache = {};       // { [clave]: registro }
+  var horaSelIdx = 0;
+  var huboPrimeraCargaConfig = true; // el tablero se pinta en 0 desde el arranque, sin esperar a Firebase
+
+  function obtenerRegistroTurno(fecha, turno){
+    var fk = claveFecha(fecha);
+    if(datosPorTurnoCache[fk] && datosPorTurnoCache[fk][turno]) return datosPorTurnoCache[fk][turno];
+    return registroTurnoPorDefecto(turno);
+  }
+  function obtenerRegistroSorting(fecha, turno){
+    var fk = claveFecha(fecha);
+    if(sortingPorTurnoCache[fk] && sortingPorTurnoCache[fk][turno]) return sortingPorTurnoCache[fk][turno];
+    return registroSortingPorDefecto();
+  }
+  function registroActual(){
+    if(!sesion.turno) return null;
+    return obtenerRegistroTurno(configCache.fecha, sesion.turno);
+  }
   function registroSortingActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistroSorting(estado.fecha, estado.turno, true);
+    if(!sesion.turno) return null;
+    return obtenerRegistroSorting(configCache.fecha, sesion.turno);
+  }
+
+  function calcularAcumuladoRegistro(reg){
+    var meta = (reg && reg.transportesProgramados) || 0;
+    var sumaArmado = 0, sumaCargado = 0;
+    ((reg && reg.horas) || []).forEach(function(h){
+      sumaArmado += (h.armado||0);
+      sumaCargado += (h.cargado||0);
+    });
+    return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
   }
 
   // Un bloque esta "atrasado" si tiene hora de corte, no esta marcado, y
@@ -745,161 +793,100 @@
     return ahoraMin >= corteMin;
   }
 
-  function datosPorDefecto(){
-    return {
-      turno:"", nombreBackus:"", nombreLavoro:"", nombreSorting:"",
-      subarea:"T2", fecha:"", area:"LOG",
-      monitoreo:"Unidades cargadas x horas planificadas",
-      datosPorTurno:{},
-      sortingPorTurno:{},
-      planes:[
-        {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
-        {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
-        {n:3,accion:"Solicitar personal de carga de furgones para picking"},
-        {n:4,accion:""},
-        {n:5,accion:"Solicitar refuerzo con movilizador de otro turno"},
-        {n:6,accion:"Mantener"},
-        {n:7,accion:""},{n:8,accion:""},{n:9,accion:""},{n:10,accion:""}
-      ]
-    };
+  /* ============== ESCRITURA A FIREBASE (siempre por ruta exacta, nunca el objeto completo) ============== */
+  var _debounceTimers = {};
+
+  function reportarErrorGuardado(err){
+    console.error("No se pudo guardar en Firebase:", err);
+    toast("No se pudo guardar. Revisa tu conexi\u00f3n a internet.");
   }
 
-  function fechaHoyStr(){
-    var d = new Date();
-    var dd = String(d.getDate()).padStart(2,"0");
-    var mm = String(d.getMonth()+1).padStart(2,"0");
-    var yy = d.getFullYear();
-    return dd+"/"+mm+"/"+yy;
+  function escribir(ref, valor){
+    if(!ref) return;
+    ref.set(valor).catch(reportarErrorGuardado);
   }
 
-  function cargarEstado(){
-    try{
-      var raw = leerValor(DATA_KEY);
-      if(raw){ estado = JSON.parse(raw); }
-      else { estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    }catch(e){ estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    if(!estado.fecha) estado.fecha = fechaHoyStr();
-    if(!estado.datosPorTurno) estado.datosPorTurno = {};
-    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-    if(estado.nombreSorting === undefined) estado.nombreSorting = "";
-    // Migracion de formato antiguo (una sola tabla de horas compartida
-    // para todos los turnos) hacia el nuevo formato separado por turno.
-    if(estado.horas && estado.horas.length && estado.turno){
-      var fk = claveFecha(estado.fecha);
-      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-      if(!estado.datosPorTurno[fk][estado.turno]){
-        estado.datosPorTurno[fk][estado.turno] = {
-          horas: estado.horas,
-          transportesProgramados: estado.transportesProgramados || 74
-        };
-      }
-    }
-    delete estado.horas;
-    delete estado.transportesProgramados;
+  function escribirConDebounce(clave, ref, valor, delayMs){
+    if(!ref) return;
+    if(_debounceTimers[clave]) clearTimeout(_debounceTimers[clave]);
+    _debounceTimers[clave] = setTimeout(function(){
+      ref.set(valor).catch(reportarErrorGuardado);
+    }, delayMs || 350);
   }
 
-  function guardarEstado(){
-    try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
-    guardarEnNube(estado);
+  // Crea el registro de un turno (ABInBev/Externo o Sorting) SOLO si
+  // todavia no existe, usando una transaccion at\u00f3mica: si dos personas
+  // ingresan al mismo turno al mismo tiempo, Firebase garantiza que
+  // solo una de las dos lo crea y la otra no pisa nada.
+  function asegurarRegistroTurno(fecha, turno){
+    if(!refDatosTurno) return;
+    var fk = claveFecha(fecha);
+    hijo(refDatosTurno, fk + "/" + turno).transaction(function(actual){
+      if(actual === null) return registroTurnoPorDefecto(turno);
+      return undefined; // ya existe: no tocar nada
+    });
   }
-  function cargarHistorico(){ try{ var raw = leerValor(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
-  function guardarHistorico(lista){ try{ guardarValor(HIST_KEY, JSON.stringify(lista)); }catch(e){} }
-
-  /* ============== SINCRONIZACION EN LA NUBE (Firebase Realtime Database) ==============
-     localStorage sigue siendo la copia inmediata y segura (nunca se
-     deja de escribir ahi). Ademas, se manda TODO el estado actual a
-     Firebase, para que cualquier dispositivo pueda leer la misma
-     informacion al instante (sin necesidad de refrescar la pagina).
-     Si la red falla, los datos ya quedaron a salvo en localStorage y
-     no se pierde nada. */
-
-  function nombreUsuarioActualParaNube(){
-    if(rolActual === "backus") return estado.nombreBackus || "";
-    if(rolActual === "lavoro") return estado.nombreLavoro || "";
-    if(rolActual === "sorting") return estado.nombreSorting || "";
-    return "";
-  }
-
-  // Guarda con un pequeno "debounce": si el usuario esta escribiendo
-  // rapido (varias teclas seguidas), se agrupan los guardados y solo se
-  // manda UNA escritura a Firebase con el estado mas reciente, en vez de
-  // una escritura por cada tecla.
-  function guardarEnNube(datos){
-    if(!rolActual || !dbEstadoRef) return; // sin sesion activa o sin Firebase, no hay nada que sincronizar
-    huboEdicionLocalPendiente = true;
-    if(nubeGuardarTimeoutId) clearTimeout(nubeGuardarTimeoutId);
-    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 800);
-  }
-
-  function enviarANube(datos){
-    if(!rolActual || !dbEstadoRef){ huboEdicionLocalPendiente = false; return; }
-    nubeGuardandoAhora = true;
-    dbEstadoRef.set(datos).then(function(){
-      nubeGuardandoAhora = false;
-      huboEdicionLocalPendiente = false;
-    }).catch(function(err){
-      console.error("No se pudo guardar en Firebase (se mantiene en localStorage):", err);
-      nubeGuardandoAhora = false;
-      huboEdicionLocalPendiente = false;
+  function asegurarRegistroSorting(fecha, turno){
+    if(!refSorting) return;
+    var fk = claveFecha(fecha);
+    hijo(refSorting, fk + "/" + turno).transaction(function(actual){
+      if(actual === null) return registroSortingPorDefecto();
+      return undefined; // ya existe: no tocar nada
     });
   }
 
-  /* ============== REPORTE DE STATUS (1 registro por click en "Enviar por WhatsApp") ==============
-     Independiente de la sincronizacion en tiempo real de "estadoApp".
-     Guarda 1 registro bajo reportes/{ROL}/{clave} en Firebase. Si ya
-     existe esa fecha+turno+hora_reporte, se sobreescribe en vez de
-     duplicarse. */
-  function enviarReporteStatus(camposReporte, mensajeExacto){
-    if(!rolActual || !firebaseApp) return;
-    try{
-      var nombreNodo = rolActual === "backus" ? "BACKUS" : (rolActual === "sorting" ? "SORTING" : "EXTERNO");
-      var registro = {
-        fecha: estado.fecha || "",
-        turno: estado.turno || "",
-        usuario: nombreUsuarioActualParaNube(),
-        comentario_status: mensajeExacto || "",
-        timestamp: Date.now()
-      };
-      if(camposReporte && typeof camposReporte === "object"){
-        Object.keys(camposReporte).forEach(function(k){ registro[k] = camposReporte[k]; });
-      }
-      var claveFila = (estado.fecha||"x") + "_" + (estado.turno||"x") + "_" + (registro.hora_reporte||"sinhora");
-      claveFila = claveFila.replace(/[.#$\[\]\/\s]/g, "-");
-      firebase.database().ref("reportes/" + nombreNodo + "/" + claveFila).set(registro).catch(function(err){
-        console.error("No se pudo enviar el reporte de status a Firebase:", err);
-      });
-    }catch(err){
-      console.error("No se pudo enviar el reporte de status a Firebase:", err);
-    }
+  /* ============== ESCUCHA EN TIEMPO REAL (cada dispositivo recibe cada cambio al instante) ============== */
+  function elEsFoco(id){
+    return document.activeElement && document.activeElement.id === id;
   }
 
-  // Escucha en tiempo real: cada vez que CUALQUIER dispositivo escribe en
-  // Firebase, todos los demas reciben el cambio al instante (sin esperar
-  // a un refresco por tiempo). Si el propio dispositivo acaba de
-  // escribir (o esta a punto de hacerlo), se ignora ese eco para no
-  // pisar lo que el usuario esta escribiendo en ese momento.
   function iniciarEscuchaNube(){
-    if(!dbEstadoRef) return;
-    dbEstadoRef.on("value", function(snapshot){
-      if(huboEdicionLocalPendiente || nubeGuardandoAhora) return;
-      var val = snapshot.val();
-      if(!val) return;
+    if(!dbOK) return;
 
-      estado = val;
-      if(!estado.fecha) estado.fecha = fechaHoyStr();
-      if(!estado.datosPorTurno) estado.datosPorTurno = {};
-      if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-      if(estado.nombreSorting === undefined) estado.nombreSorting = "";
-
-      try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
-
-      if(document.getElementById("vista-app").style.display !== "none"){
-        render();
+    refConfig.on("value", function(snap){
+      var val = snap.val();
+      configCache = val ? val : configPorDefecto();
+      if(!configCache.fecha) configCache.fecha = fechaHoyStr();
+      if(!configCache.planes || !configCache.planes.length) configCache.planes = configPorDefecto().planes;
+      // Auto-correccion: si la fecha quedo guardada en formato ISO
+      // (bug antiguo), se normaliza y se vuelve a guardar ya corregida
+      // para que quede arreglado para todos de forma permanente.
+      var fechaVisible = formatearFechaVisible(configCache.fecha);
+      if(fechaVisible !== "-" && fechaVisible !== configCache.fecha){
+        configCache.fecha = fechaVisible;
+        escribir(hijo(refConfig, "fecha"), fechaVisible);
       }
+      huboPrimeraCargaConfig = true;
+      if(vistaAppVisible()) renderPreservandoFoco();
       actualizarDashboardInicio();
-    }, function(err){
-      console.error("No se pudo escuchar cambios en Firebase (se sigue usando localStorage):", err);
-    });
+    }, function(err){ console.error("Error escuchando estadoApp/config:", err); });
+
+    refDatosTurno.on("value", function(snap){
+      datosPorTurnoCache = snap.val() || {};
+      if(vistaAppVisible()) renderPreservandoFoco();
+      actualizarDashboardInicio();
+    }, function(err){ console.error("Error escuchando estadoApp/datosPorTurno:", err); });
+
+    refSorting.on("value", function(snap){
+      sortingPorTurnoCache = snap.val() || {};
+      if(vistaAppVisible() && sesion.rol === "sorting") renderPreservandoFoco();
+    }, function(err){ console.error("Error escuchando estadoApp/sortingPorTurno:", err); });
+
+    refHistorico.on("value", function(snap){
+      historicoCache = snap.val() || {};
+      if(vistaAppVisible() && sesion.rol === "backus") renderHistorico();
+    }, function(err){ console.error("Error escuchando estadoApp/historico:", err); });
+  }
+
+  function vistaAppVisible(){
+    return document.getElementById("vista-app").style.display !== "none";
+  }
+
+  // Vuelve a pintar todo, pero sin robarle el foco/valor al campo que la
+  // persona est\u00e1 escribiendo en este preciso momento (asi, si otra
+  // persona actualiza algo mientras tu escribes, tu campo no se borra).
+  function renderPreservandoFoco(){
+    render();
   }
 
   function toast(msg){
@@ -914,11 +901,6 @@
     return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   }
 
-  // Nombre CORTO del turno que ve el usuario: solo "Ma\u00f1ana" / "Tarde" /
-  // "Noche" (sin la palabra "Turno", para no repetirla en textos que ya
-  // dicen "Turno: ..." o en la etiqueta "TURNO"). Esto es SOLO texto de
-  // presentacion: las claves internas usadas para guardar y filtrar
-  // datos ("Turno 1 - Ma\u00f1ana", etc.) no cambian en ningun lado.
   function nombreCortoTurno(turno){
     if(turno === "Turno 1 - Ma\u00f1ana") return "Ma\u00f1ana";
     if(turno === "Turno 2 - Tarde") return "Tarde";
@@ -928,7 +910,7 @@
 
   /* ============== PANTALLA INICIAL: MENU DE USUARIO ============== */
   var CLAVE_ABINBEV = "@vpo2026";
-  var rolSeleccionado = null; // "backus" (ABInBev) | "lavoro" (Externo)
+  var rolSeleccionado = null; // "backus" | "lavoro" | "sorting"
 
   var elUserMenu = document.getElementById("user-menu");
   var elBtnUserMenu = document.getElementById("btn-user-menu");
@@ -991,23 +973,25 @@
         if(pass !== CLAVE_ABINBEV){ err.textContent = "Contrase\u00f1a incorrecta."; return; }
       }
       err.textContent = "";
-      if(!estado) cargarEstado();
-      estado.turno = turno;
-      // Cada rol guarda su propio registro, por su propia clave
-      // fecha+turno. Nunca se mezclan entre si.
-      if(rolSeleccionado === "backus"){
-        estado.nombreBackus = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
-      } else if(rolSeleccionado === "sorting"){
-        estado.nombreSorting = nombre;
-        obtenerRegistroSorting(estado.fecha, turno, true);
-      } else {
-        estado.nombreLavoro = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
+      if(!dbOK){
+        // Sin conexion a Firebase en este momento: se deja entrar
+        // igual (todo arranca en 0 y la app funciona con normalidad);
+        // en cuanto haya conexion, los datos se sincronizaran solos.
+        toast("Sin conexi\u00f3n a la base de datos por ahora. Podr\u00e1s seguir usando la app y se sincronizar\u00e1 cuando vuelva la conexi\u00f3n.");
       }
+
+      sesion = { rol: rolSeleccionado, turno: turno, nombre: nombre };
+      guardarSesion(sesion);
+
+      // Asegura que el registro de este turno exista en Firebase (en
+      // cero si es la primera vez), sin pisar datos si ya existia.
+      if(rolSeleccionado === "sorting"){
+        asegurarRegistroSorting(configCache.fecha, turno);
+      } else {
+        asegurarRegistroTurno(configCache.fecha, turno);
+      }
+
       horaSelIdx = 0;
-      guardarEstado();
-      guardarSesion(SESSION_KEY, rolSeleccionado);
       mostrarApp(rolSeleccionado);
     }catch(e){
       err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
@@ -1015,18 +999,16 @@
   });
 
   function mostrarApp(rol){
-    rolActual = rol;
     document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.body.classList.add("rol-" + rol);
     document.getElementById("vista-login").style.display = "none";
     document.getElementById("vista-app").style.display = "block";
-    if(!estado) cargarEstado();
     render();
   }
 
   function cerrarSesion(){
-    borrarSesion(SESSION_KEY);
-    rolActual = null;
+    borrarSesion();
+    sesion = { rol:null, turno:null, nombre:null };
     rolSeleccionado = null;
     document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.getElementById("vista-app").style.display = "none";
@@ -1038,15 +1020,16 @@
     elFormLogin.classList.remove("open");
     cerrarMenuUsuario();
     detenerAlarmaSorting();
+    silenciarAlarma(true);
     actualizarDashboardInicio();
   }
 
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
 
   document.getElementById("btn-reset").addEventListener("click", function(){
-    if(!estado || !estado.turno) return;
+    if(!sesion.turno) return;
     var ok = confirm(
-      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(estado.turno) + ") a cero:\n\n" +
+      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(sesion.turno) + ") a cero:\n\n" +
       "- Transportes programados de este turno\n" +
       "- Armados y Cargados de todas las horas de este turno\n\n" +
       "Los datos de los OTROS turnos y el hist\u00f3rico ya guardado NO se borran.\n\n" +
@@ -1054,61 +1037,53 @@
     );
     if(!ok) return;
 
-    var fk = claveFecha(estado.fecha);
-    if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-    estado.datosPorTurno[fk][estado.turno] = {
-      horas: generarHorasPorTurno(estado.turno),
-      transportesProgramados: 74
-    };
+    var fk = claveFecha(configCache.fecha);
+    escribir(hijo(refDatosTurno, fk + "/" + sesion.turno), registroTurnoPorDefecto(sesion.turno));
     horaSelIdx = 0;
-
-    guardarEstado();
     silenciarAlarma(true);
-    render();
     toast("Reporte del turno reiniciado. Los dem\u00e1s turnos no se modificaron.");
   });
 
   /* ============== RENDER: CABECERA (Backus) ============== */
   function bindCabecera(){
     var reg = registroActual();
-    document.getElementById("c-subarea").value = estado.subarea;
-    document.getElementById("c-fecha").value = estado.fecha;
-    document.getElementById("c-area").value = estado.area;
-    document.getElementById("c-monitoreo").value = estado.monitoreo;
-    document.getElementById("c-transportes").value = reg ? reg.transportesProgramados : 0;
-    document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
-    document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarEstado(); };
-    document.getElementById("c-fecha").oninput = function(){
-      estado.fecha = this.value; guardarEstado();
-      // Cambiar de fecha mueve el contexto a otro registro (fecha+turno);
-      // nunca mezcla datos entre fechas ni entre turnos.
-      obtenerRegistro(estado.fecha, estado.turno, true);
-      horaSelIdx = 0;
-      bindInfoLavoro();
-      renderHorasGrid();
-      bindDatosHora();
-      dibujarGrafico();
-      renderHistorico();
-      actualizarMensaje();
-      actualizarMensajeArmado();
-      verificarAlarma();
-      document.getElementById("c-transportes").value = registroActual().transportesProgramados;
+    if(!elEsFoco("c-subarea")) document.getElementById("c-subarea").value = configCache.subarea;
+    if(!elEsFoco("c-fecha")) document.getElementById("c-fecha").value = configCache.fecha;
+    if(!elEsFoco("c-area")) document.getElementById("c-area").value = configCache.area;
+    if(!elEsFoco("c-monitoreo")) document.getElementById("c-monitoreo").value = configCache.monitoreo;
+    if(!elEsFoco("c-transportes")) document.getElementById("c-transportes").value = reg ? reg.transportesProgramados : 0;
+    document.getElementById("titulo-grafico").childNodes[0].nodeValue = configCache.monitoreo;
+
+    document.getElementById("c-subarea").oninput = function(){
+      configCache.subarea = this.value;
+      escribirConDebounce("cfg-subarea", hijo(refConfig, "subarea"), this.value);
     };
-    document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarEstado(); };
+    document.getElementById("c-fecha").oninput = function(){
+      configCache.fecha = this.value;
+      escribirConDebounce("cfg-fecha", hijo(refConfig, "fecha"), this.value, 500);
+      // Cambiar de fecha mueve el contexto a otro registro (fecha+turno)
+      // del turno de ESTA sesion; nunca mezcla datos entre fechas ni
+      // entre turnos. Se asegura que el nuevo registro exista (en cero).
+      if(sesion.turno){
+        if(sesion.rol === "sorting") asegurarRegistroSorting(this.value, sesion.turno);
+        else asegurarRegistroTurno(this.value, sesion.turno);
+      }
+      horaSelIdx = 0;
+    };
+    document.getElementById("c-area").oninput = function(){
+      configCache.area = this.value;
+      escribirConDebounce("cfg-area", hijo(refConfig, "area"), this.value);
+    };
     document.getElementById("c-monitoreo").oninput = function(){
-      estado.monitoreo = this.value; guardarEstado();
-      document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
+      configCache.monitoreo = this.value;
+      document.getElementById("titulo-grafico").childNodes[0].nodeValue = this.value;
+      escribirConDebounce("cfg-monitoreo", hijo(refConfig, "monitoreo"), this.value);
     };
     document.getElementById("c-transportes").oninput = function(){
-      var r = registroActual();
-      if(!r) return;
-      r.transportesProgramados = Number(this.value)||0;
-      guardarEstado();
-      dibujarGrafico();
-      actualizarMensaje();
-      actualizarMensajeArmado();
-      verificarAlarma();
+      var valor = Number(this.value)||0;
+      var fk = claveFecha(configCache.fecha);
+      escribirConDebounce("transp-" + fk + "-" + sesion.turno, hijo(refDatosTurno, fk + "/" + sesion.turno + "/transportesProgramados"), valor);
     };
 
     actualizarUIPlanAccion();
@@ -1116,8 +1091,8 @@
 
   /* ============== INFO SIMPLE (Lavoro) ============== */
   function bindInfoLavoro(){
-    document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
-    document.getElementById("lv-fecha").textContent = estado.fecha || "-";
+    document.getElementById("lv-turno").textContent = nombreCortoTurno(sesion.turno);
+    document.getElementById("lv-fecha").textContent = configCache.fecha || "-";
   }
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
@@ -1128,10 +1103,10 @@
     var meta = reg ? reg.transportesProgramados : 0;
     var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
     return "STATUS DE CARGA\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(sesion.turno) + "\n" +
+      "Supervisor: " + (sesion.nombre || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + (estado.fecha || "-") + "\n" +
+      "Fecha: " + formatearFechaVisible(configCache.fecha) + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
       "Armados (acum.): " + (h.acumArmado||0) + "\n" +
       "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
@@ -1177,10 +1152,10 @@
     var meta = reg ? (reg.transportesProgramados || 0) : 0;
     var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
     return "STATUS DE ARMADO\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Encargado: " + (estado.nombreLavoro || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(sesion.turno) + "\n" +
+      "Encargado: " + (sesion.nombre || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + (estado.fecha || "-") + "\n" +
+      "Fecha: " + formatearFechaVisible(configCache.fecha) + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
       "Armado (acum.): " + (h.acumArmado||0) + " / " + meta + "\n" +
       "Avance de armado: " + pctArmado + "%";
@@ -1245,6 +1220,28 @@
     window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
   }
 
+  /* ============== REPORTE DE STATUS (1 registro por click en "Enviar por WhatsApp") ============== */
+  function enviarReporteStatus(camposReporte, mensajeExacto){
+    if(!dbOK || !sesion.rol) return;
+    try{
+      var nombreNodo = sesion.rol === "backus" ? "BACKUS" : (sesion.rol === "sorting" ? "SORTING" : "EXTERNO");
+      var registro = {
+        fecha: formatearFechaVisible(configCache.fecha),
+        turno: sesion.turno || "",
+        usuario: sesion.nombre || "",
+        comentario_status: mensajeExacto || "",
+        timestamp: Date.now()
+      };
+      if(camposReporte && typeof camposReporte === "object"){
+        Object.keys(camposReporte).forEach(function(k){ registro[k] = camposReporte[k]; });
+      }
+      var claveFila = claveSegura(registro.fecha) + "_" + claveSegura(registro.turno) + "_" + claveSegura(registro.hora_reporte || "sinhora");
+      firebase.database().ref("reportes/" + nombreNodo + "/" + claveFila).set(registro).catch(reportarErrorGuardado);
+    }catch(err){
+      console.error("No se pudo enviar el reporte de status a Firebase:", err);
+    }
+  }
+
   /* ============== HORAS: SELECTOR + CAMPOS (compartido) ============== */
   function renderHorasGrid(){
     var cont = document.getElementById("horas-grid");
@@ -1272,10 +1269,10 @@
     var reg = registroActual();
     if(!reg) return;
     var h = reg.horas[horaSelIdx];
-    document.getElementById("d-armado").value = h.armado || 0;
+    if(!elEsFoco("d-armado")) document.getElementById("d-armado").value = h.armado || 0;
     var elCargado = document.getElementById("d-cargado");
-    elCargado.value = h.cargado || 0;
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
+    if(!elEsFoco("d-cargado")) elCargado.value = h.cargado || 0;
+    if(cargadoBloqueadoEnHora(sesion.turno, h.hora)){
       elCargado.disabled = true;
       elCargado.title = "No se permite registrar Cargados a la 1:00 am (Turno Noche).";
     } else {
@@ -1305,24 +1302,35 @@
 
   document.getElementById("d-armado").addEventListener("input", function(){
     var reg = registroActual();
-    if(!reg) return;
-    reg.horas[horaSelIdx].armado = Number(this.value)||0;
+    if(!reg || !sesion.turno) return;
+    var fk = claveFecha(configCache.fecha);
+    var valor = Number(this.value)||0;
+    var horasSimuladas = reg.horas.map(function(h){ return {armado:h.armado, cargado:h.cargado}; });
+    horasSimuladas[horaSelIdx].armado = valor;
+
     // Si al bajar el armado, el cargado ya registrado en esta hora queda
     // por encima de lo permitido, se ajusta automaticamente hacia abajo.
-    var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
+    var cumArmadoHastaHora = 0;
+    for(var i=0; i<=horaSelIdx; i++){ cumArmadoHastaHora += (horasSimuladas[i].armado||0); }
+    var cumCargadoAnteriores = 0;
+    for(var j=0; j<horaSelIdx; j++){ cumCargadoAnteriores += (horasSimuladas[j].cargado||0); }
+    var maxPermitido = Math.max(0, cumArmadoHastaHora - cumCargadoAnteriores);
+
+    var base = fk + "/" + sesion.turno + "/horas/" + horaSelIdx;
+    escribirConDebounce("armado-" + base, hijo(refDatosTurno, base + "/armado"), valor);
+
     if((reg.horas[horaSelIdx].cargado||0) > maxPermitido){
-      reg.horas[horaSelIdx].cargado = maxPermitido;
+      escribir(hijo(refDatosTurno, base + "/cargado"), maxPermitido);
       document.getElementById("d-cargado").value = maxPermitido;
       toast("Cargados ajustado: no puede superar lo armado (m\u00e1x. " + maxPermitido + ")");
     }
-    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
+
   document.getElementById("d-cargado").addEventListener("input", function(){
     var reg = registroActual();
-    if(!reg) return;
+    if(!reg || !sesion.turno) return;
     var h = reg.horas[horaSelIdx];
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
-      // Bloqueo duro por si el input llega a habilitarse por otra via.
+    if(cargadoBloqueadoEnHora(sesion.turno, h.hora)){
       this.value = h.cargado || 0;
       toast("No se permite registrar Cargados a la 1:00 am (Turno Noche).");
       return;
@@ -1334,33 +1342,33 @@
       this.value = valor;
       toast("No puedes cargar m\u00e1s de lo armado. M\u00e1ximo permitido: " + maxPermitido);
     }
-    reg.horas[horaSelIdx].cargado = valor;
-    guardarEstado(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
+    var fk = claveFecha(configCache.fecha);
+    var base = fk + "/" + sesion.turno + "/horas/" + horaSelIdx;
+    escribirConDebounce("cargado-" + base, hijo(refDatosTurno, base + "/cargado"), valor);
   });
 
   /* ============== PLANES (solo Backus) ============== */
   function renderPlanes(){
     var cont = document.getElementById("planes-lista");
+    var planes = configCache.planes || [];
     cont.innerHTML = "";
-    estado.planes.forEach(function(p, i){
+    planes.forEach(function(p, i){
+      if(elEsFoco("plan-input-" + i)) return; // no reconstruir el campo que se esta escribiendo
       var row = document.createElement("div");
       row.className = "plan-row";
-      row.innerHTML = '<div class="plan-num">'+p.n+'</div><input data-i="'+i+'" placeholder="Acci\u00f3n..." value="'+escapeAttr(p.accion)+'">';
+      row.innerHTML = '<div class="plan-num">'+p.n+'</div><input id="plan-input-'+i+'" data-i="'+i+'" placeholder="Acci\u00f3n..." value="'+escapeAttr(p.accion)+'">';
       cont.appendChild(row);
     });
     cont.querySelectorAll("input").forEach(function(inp){
       inp.addEventListener("input", function(){
-        estado.planes[Number(this.dataset.i)].accion = this.value;
-        guardarEstado();
+        var i = Number(this.dataset.i);
+        configCache.planes[i].accion = this.value;
+        escribirConDebounce("plan-" + i, hijo(refConfig, "planes/" + i + "/accion"), this.value);
       });
     });
   }
 
   /* ============== CALCULO (compartido) ============== */
-  // "armado"/"cargado" de cada hora son lo hecho EN ESA hora, dentro del
-  // registro del turno actualmente activo. Aqui se calcula el acumulado
-  // (suma) hora a hora para los graficos y porcentajes de ese turno,
-  // sin tocar los datos de ningun otro turno.
   function calcularPorcentajes(){
     var reg = registroActual();
     if(!reg) return 0;
@@ -1419,25 +1427,17 @@
       ctx.fillText(Math.round(f*100) + "%", padL - 6, y);
     });
 
-    /* FONDO ESTATICO escalonado rojo/verde: es un tablero fijo, NUNCA
-       se recalcula con datos reales. Cada escalon representa el avance
-       ideal esperado a esa hora (i+1 de n horas del turno), dividiendo
-       el turno en partes iguales hasta el 100%. Este fondo no cambia
-       aunque cambien los datos: lo unico dinamico es la linea negra de
-       abajo, que sube y baja segun el % real acumulado de cada hora. */
     var pctPts = horas.map(function(h,i){ return {x:xPos(i), y:yPos(h.pct||0)}; });
 
     for(var s=0; s<n; s++){
       var xa = xPos(s);
       var xb = (s < n-1) ? xPos(s+1) : (padL + chartW);
-      var metaEscalonFijo = (s+1) / n; // escalon fijo, no depende de datos reales
+      var metaEscalonFijo = (s+1) / n;
       var yLimite = yPos(metaEscalonFijo);
       var yTop = yPos(1);
       var yBase = yPos(0);
-      // bloque rojo fijo (lo que falta hasta la meta de esa hora)
       ctx.fillStyle = "#C00000";
       ctx.fillRect(xa, yLimite, xb-xa, yBase-yLimite);
-      // bloque verde fijo (meta ya cubierta a esa hora)
       ctx.fillStyle = "#00B050";
       ctx.fillRect(xa, yTop, xb-xa, yLimite-yTop);
     }
@@ -1462,7 +1462,6 @@
       });
     }
 
-    // Etiquetas de hora en el eje X, en HORIZONTAL, bien espaciadas.
     ctx.fillStyle = "#8d99a3";
     ctx.font = "9px Inter, sans-serif";
     ctx.textAlign = "center";
@@ -1490,10 +1489,9 @@
     document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(reg.transportesProgramados||0);
   }
 
-  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ==============
-     Se filtra por turno usando "filtroInicioActual". Si es "todos", se
-     suman los 3 turnos de la fecha actual (Total del Dia). Nunca mezcla
-     ni copia datos entre turnos: cada uno se lee de su propio registro. */
+  /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login) ============== */
+  var filtroInicioActual = "todos";
+
   function dibujarGraficoInicio(pctArmado, pctCargado){
     var canvas = document.getElementById("grafico-inicio");
     if(!canvas) return;
@@ -1543,19 +1541,17 @@
   }
 
   function actualizarDashboardInicio(){
-    if(!estado) cargarEstado();
-    if(!estado){ return; }
-
-    var fechaRef = estado.fecha || fechaHoyStr();
+    if(!huboPrimeraCargaConfig) return;
+    var fechaRef = configCache.fecha || fechaHoyStr();
     var totalArmado = 0, totalCargado = 0, meta = 0;
 
     if(filtroInicioActual !== "todos"){
-      var reg = obtenerRegistro(fechaRef, filtroInicioActual, false);
+      var reg = obtenerRegistroTurno(fechaRef, filtroInicioActual);
       var c = calcularAcumuladoRegistro(reg);
       totalArmado = c.armado; totalCargado = c.cargado; meta = c.meta;
     } else {
       TURNOS_VALIDOS.forEach(function(t){
-        var r = obtenerRegistro(fechaRef, t, false);
+        var r = obtenerRegistroTurno(fechaRef, t);
         var c2 = calcularAcumuladoRegistro(r);
         totalArmado += c2.armado; totalCargado += c2.cargado; meta += c2.meta;
       });
@@ -1588,16 +1584,15 @@
   window.addEventListener("resize", function(){
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(function(){
-      if(estado && document.getElementById("vista-app").style.display !== "none"){ dibujarGrafico(); }
-      if(estado && document.getElementById("vista-login").style.display !== "none"){ actualizarDashboardInicio(); }
+      if(vistaAppVisible()){ dibujarGrafico(); }
+      if(document.getElementById("vista-login").style.display !== "none"){ actualizarDashboardInicio(); }
     }, 150);
   });
 
-  /* ============== ACTUALIZAR ============== */
+  /* ============== ACTUALIZAR (guarda en el historico compartido) ============== */
   document.getElementById("btn-actualizar").addEventListener("click", function(){
     var reg = registroActual();
     if(!reg) return;
-    guardarEstado();
     dibujarGrafico();
     renderHorasGrid();
     guardarEnHistorico();
@@ -1608,24 +1603,23 @@
     toast("Hora " + reg.horas[horaSelIdx].hora + " actualizada");
   });
 
-  /* ============== HISTORICO (solo Backus) ============== */
+  /* ============== HISTORICO (solo Backus, compartido en tiempo real) ============== */
   function guardarEnHistorico(){
     calcularPorcentajes();
     var reg = registroActual();
-    if(!reg) return;
-    var lista = cargarHistorico();
+    if(!reg || !dbOK) return;
     var h = reg.horas[horaSelIdx];
     var pct = reg.transportesProgramados > 0 ? (h.acumCargado||0)/reg.transportesProgramados : 0;
+    var fechaVisible = formatearFechaVisible(configCache.fecha);
 
     var registro = {
       ts: Date.now(),
-      fecha: estado.fecha,
+      fecha: fechaVisible,
       hora: h.hora,
-      turno: estado.turno,
-      supervisor: estado.nombreBackus,
-      encargadoArmado: estado.nombreLavoro,
-      subarea: estado.subarea,
-      area: estado.area,
+      turno: sesion.turno,
+      supervisor: sesion.nombre,
+      subarea: configCache.subarea,
+      area: configCache.area,
       transportesProgramados: reg.transportesProgramados,
       armado: h.armado||0,
       cargado: h.cargado||0,
@@ -1634,23 +1628,18 @@
       pct: pct
     };
 
-    // Clave unica de registro historico: fecha + turno + hora, para que
-    // dos turnos distintos con la misma hora del dia NUNCA se pisen.
-    var idx = lista.findIndex(function(r){
-      return String(r.fecha).trim() === String(estado.fecha).trim() &&
-             String(r.turno||"").trim() === String(estado.turno||"").trim() &&
-             String(r.hora).trim() === String(h.hora).trim();
-    });
-    if(idx >= 0) lista[idx] = registro; else lista.push(registro);
-
-    lista.sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
-    guardarHistorico(lista);
-    renderHistorico();
+    // Clave unica y determin\u00edstica: fecha + turno + hora, para que dos
+    // turnos distintos con la misma hora del d\u00eda NUNCA se pisen, y para
+    // que volver a actualizar la misma hora sobreescriba ese mismo
+    // registro en vez de duplicarlo.
+    var clave = claveSegura(fechaVisible) + "_" + claveSegura(sesion.turno) + "_" + claveSegura(h.hora);
+    escribir(hijo(refHistorico, clave), registro);
   }
 
   function renderHistorico(){
     var cont = document.getElementById("hist-lista");
-    var lista = cargarHistorico();
+    var lista = Object.keys(historicoCache).map(function(k){ return historicoCache[k]; });
+    lista.sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
     cont.innerHTML = "";
     if(!lista.length){
       cont.innerHTML = '<div class="hist-empty">A&uacute;n no hay registros guardados.</div>';
@@ -1663,23 +1652,23 @@
       var item = document.createElement("div");
       item.className = "hist-item";
       item.innerHTML =
-        '<span class="hist-fecha">'+escapeAttr(r.fecha||"-")+'<br>'+escapeAttr(r.hora||"-")+'</span>'+
+        '<span class="hist-fecha">'+escapeAttr(formatearFechaVisible(r.fecha))+'<br>'+escapeAttr(r.hora||"-")+'</span>'+
         '<span class="hist-info">'+escapeAttr(nombreCortoTurno(r.turno))+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
         '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
       item.addEventListener("click", function(){
-        if(!r.turno || r.turno !== estado.turno){
+        if(!r.turno || r.turno !== sesion.turno){
           toast("Ese registro es de otro turno (" + nombreCortoTurno(r.turno) + "). Ingresa a ese turno para editarlo.");
           return;
         }
-        if(confirm("Cargar los datos de "+r.fecha+" "+r.hora+" ("+nombreCortoTurno(r.turno)+") al editor?")){
+        if(confirm("Cargar los datos de "+formatearFechaVisible(r.fecha)+" "+r.hora+" ("+nombreCortoTurno(r.turno)+") al editor?")){
           var reg = registroActual();
           var idx = reg.horas.findIndex(function(h){ return h.hora === r.hora; });
           if(idx >= 0){
-            reg.horas[idx].armado = r.armado;
-            reg.horas[idx].cargado = r.cargado;
+            var fk = claveFecha(configCache.fecha);
+            var base = fk + "/" + sesion.turno + "/horas/" + idx;
+            escribir(hijo(refDatosTurno, base + "/armado"), r.armado||0);
+            escribir(hijo(refDatosTurno, base + "/cargado"), r.cargado||0);
             horaSelIdx = idx;
-            guardarEstado();
-            render();
             toast("Datos de "+r.hora+" cargados");
           }
         }
@@ -1689,50 +1678,40 @@
   }
 
   /* ============== PLAN DE ACCION / ALARMA DE CUMPLIMIENTO ============== */
-  /* Corre siempre (desde el arranque de la app), independiente de si hay
-     alguien con sesion iniciada, para que la alerta se vea/suene tambien
-     en la pantalla inicial. La logica de corte horario no cambia, y
-     siempre evalua el turno actualmente activo en la sesion. */
   var alarmaActiva = false;
   var alarmaSonidoId = null;
   var monitorAlarmaId = null;
 
-  // Minutos transcurridos desde el inicio del turno hasta AHORA,
-  // manejando el cruce de medianoche (ej. turno nocturno).
-  function minutosDesdeInicioTurno(){
-    if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
+  function minutosDesdeInicioTurno(turno){
+    if(!turno || !TURNO_INICIO.hasOwnProperty(turno)) return null;
     var ahora = new Date();
     var actualMin = ahora.getHours()*60 + ahora.getMinutes();
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var inicioMin = TURNO_INICIO[turno]*60;
     var diff = actualMin - inicioMin;
     if(diff < 0) diff += 24*60;
     return diff;
   }
 
-  // Minutos desde el inicio del turno hasta su hora de corte, manejando
-  // el cruce de medianoche.
-  function minutosDesdeInicioHastaCorte(){
-    if(!estado || !TURNO_CORTE[estado.turno] || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var corte = TURNO_CORTE[estado.turno];
+  function minutosDesdeInicioHastaCorte(turno){
+    if(!turno || !TURNO_CORTE[turno] || !TURNO_INICIO.hasOwnProperty(turno)) return null;
+    var corte = TURNO_CORTE[turno];
     var corteMin = corte.h*60 + corte.m;
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var inicioMin = TURNO_INICIO[turno]*60;
     var diff = corteMin - inicioMin;
     if(diff < 0) diff += 24*60;
     return diff;
   }
 
-  function horaDeCortePasada(){
-    var transcurrido = minutosDesdeInicioTurno();
-    var hastaCorte = minutosDesdeInicioHastaCorte();
+  function horaDeCortePasada(turno){
+    var transcurrido = minutosDesdeInicioTurno(turno);
+    var hastaCorte = minutosDesdeInicioHastaCorte(turno);
     if(transcurrido === null || hastaCorte === null) return false;
-    // Margen de 1 hora despues del fin del turno (8h = 480min) para no
-    // arrastrar una alarma "vieja" de un turno anterior.
     if(transcurrido > 480 + 60) return false;
     return transcurrido >= hastaCorte;
   }
 
   function pctCumplimientoActual(){
-    if(!estado || !estado.turno) return 0;
+    if(!sesion.turno) return 0;
     calcularPorcentajes();
     var reg = registroActual();
     if(!reg || !reg.horas.length) return 0;
@@ -1756,16 +1735,14 @@
     }catch(e){}
   }
 
-  // Caja DENTRO de la app (ABInBev / c-plan-accion): siempre refleja el
-  // turno REAL de la sesion activa (estado.turno) y la alarma real.
   function actualizarPlanAccionApp(){
     var caja = document.getElementById("c-plan-accion");
     if(!caja) return;
     if(alarmaActiva){
       caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
       caja.classList.add("alerta");
-    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
-      var corte = TURNO_CORTE[estado.turno];
+    } else if(sesion.turno && TURNO_CORTE[sesion.turno]){
+      var corte = TURNO_CORTE[sesion.turno];
       var hh = String(corte.h).padStart(2,"0");
       var mm = String(corte.m).padStart(2,"0");
       caja.value = "OK \u00b7 corte " + hh + ":" + mm;
@@ -1776,22 +1753,16 @@
     }
   }
 
-  // Caja de la PANTALLA PRINCIPAL (#alerta-inicio): sigue el filtro que
-  // el usuario elige ah\u00ed mismo (Ma\u00f1ana/Tarde/Noche/TODOS), NO el
-  // turno de la sesion activa. Por eso, al hacer click en un filtro,
-  // ahora si se actualiza con la hora de corte REAL de ese turno.
   function actualizarAlertaInicio(){
     var caja = document.getElementById("alerta-inicio");
     if(!caja) return;
     var turnoVisto = (filtroInicioActual !== "todos") ? filtroInicioActual : null;
     if(!turnoVisto){
-      // "TODOS" combina 3 turnos, cada uno con su propia hora de corte,
-      // asi que no hay una sola hora de corte que mostrar aqui.
       caja.textContent = "-";
       caja.classList.remove("alerta");
       return;
     }
-    var esElTurnoConAlarma = alarmaActiva && estado && estado.turno === turnoVisto;
+    var esElTurnoConAlarma = alarmaActiva && sesion.turno === turnoVisto;
     if(esElTurnoConAlarma){
       caja.textContent = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
       caja.classList.add("alerta");
@@ -1830,8 +1801,8 @@
   }
 
   function verificarAlarma(){
-    if(!estado || !estado.turno) { actualizarUIPlanAccion(); return; }
-    if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){
+    if(!sesion.turno){ actualizarUIPlanAccion(); return; }
+    if(horaDeCortePasada(sesion.turno) && pctCumplimientoActual() < 0.5){
       dispararAlarma();
     } else {
       actualizarUIPlanAccion();
@@ -1868,10 +1839,6 @@
   }
 
   /* ============== SORTING: LISTA DE BLOQUES ============== */
-  // Construye la lista completa de bloques (checkbox + input de cajas).
-  // Se llama una vez por sesion/render; los cambios puntuales (marcar,
-  // escribir cajas) actualizan el DOM existente sin reconstruir todo,
-  // para no perder el foco mientras el usuario escribe.
   function renderBloques(){
     var reg = registroSortingActual();
     var cont = document.getElementById("bloques-lista");
@@ -1887,66 +1854,53 @@
       fila.className = "bloque-item" + (atrasado ? " atrasado" : "");
       fila.innerHTML =
         '<label class="bloque-check">' +
-          '<input type="checkbox" class="bloque-chk" data-i="' + i + '"' + (b.marcado ? " checked" : "") + '>' +
+          '<input type="checkbox" class="bloque-chk" id="bloque-chk-' + i + '" data-i="' + i + '"' + (b.marcado ? " checked" : "") + '>' +
           '<span class="bloque-nombre">' + escapeAttr(b.nombre) +
             (detalle.length ? ('<small>' + escapeAttr(detalle.join(" \u00b7 ")) + '</small>') : '') +
           '</span>' +
         '</label>' +
-        '<input type="text" inputmode="numeric" class="bloque-cajas" data-i="' + i + '" placeholder="Cajas" value="' + (b.cajas || 0) + '"' + (b.marcado ? "" : " disabled") + '>';
+        '<input type="text" inputmode="numeric" class="bloque-cajas" id="bloque-cajas-' + i + '" data-i="' + i + '" placeholder="Cajas" value="' + (b.cajas || 0) + '"' + (b.marcado ? "" : " disabled") + '>';
       cont.appendChild(fila);
     });
 
     cont.querySelectorAll(".bloque-chk").forEach(function(chk){
       chk.addEventListener("change", function(){
         var reg2 = registroSortingActual();
-        if(!reg2) return;
+        if(!reg2 || !sesion.turno) return;
         var i = Number(this.dataset.i);
-        reg2.bloques[i].marcado = this.checked;
-        guardarEstado();
+        var fk = claveFecha(configCache.fecha);
+        escribir(hijo(refSorting, fk + "/" + sesion.turno + "/bloques/" + i + "/marcado"), this.checked);
         var fila = this.closest(".bloque-item");
         var inputCajas = fila ? fila.querySelector(".bloque-cajas") : null;
         if(inputCajas) inputCajas.disabled = !this.checked;
-        if(fila) fila.classList.toggle("atrasado", bloqueEstaAtrasado(reg2.bloques[i]));
-        actualizarMetaSorting();
-        actualizarMensajeSorting();
-        verificarAlarmaSorting();
       });
     });
 
     cont.querySelectorAll(".bloque-cajas").forEach(function(inp){
       inp.addEventListener("input", function(){
         var reg2 = registroSortingActual();
-        if(!reg2) return;
+        if(!reg2 || !sesion.turno) return;
         var i = Number(this.dataset.i);
         var valor = Number(this.value.replace(/[^0-9]/g, "")) || 0;
         if(valor > 30000){ valor = 30000; }
         this.value = valor;
-        reg2.bloques[i].cajas = valor;
-        guardarEstado();
-        actualizarMetaSorting();
-        actualizarMensajeSorting();
+        var fk = claveFecha(configCache.fecha);
+        escribirConDebounce("cajas-" + fk + "-" + sesion.turno + "-" + i, hijo(refSorting, fk + "/" + sesion.turno + "/bloques/" + i + "/cajas"), valor);
       });
       inp.addEventListener("blur", function(){
-        var reg2 = registroSortingActual();
-        if(!reg2) return;
         var i = Number(this.dataset.i);
         var valor = Number(this.value) || 0;
         if(valor > 0 && valor < 5000){
           valor = 5000;
           this.value = valor;
-          reg2.bloques[i].cajas = valor;
-          guardarEstado();
-          actualizarMetaSorting();
-          actualizarMensajeSorting();
+          var fk = claveFecha(configCache.fecha);
+          escribir(hijo(refSorting, fk + "/" + sesion.turno + "/bloques/" + i + "/cajas"), valor);
           toast("El m\u00ednimo permitido es 5,000 cajas.");
         }
       });
     });
   }
 
-  // Refresca SOLO el resaltado en rojo de "atrasado" en las filas ya
-  // pintadas, sin reconstruir los inputs (para no interrumpir si el
-  // usuario esta escribiendo en ese momento).
   function actualizarAtrasoVisualBloques(){
     var reg = registroSortingActual();
     var cont = document.getElementById("bloques-lista");
@@ -1982,33 +1936,30 @@
     var elFijo = document.getElementById("sorting-personal-fijo");
     var elRefuerzo = document.getElementById("sorting-personal-refuerzo");
     var elApoyo = document.getElementById("sorting-apoyo-validacion");
-    elFijo.value = reg.personalFijo;
-    elRefuerzo.value = reg.personalRefuerzo;
+    if(!elEsFoco("sorting-personal-fijo")) elFijo.value = reg.personalFijo;
+    if(!elEsFoco("sorting-personal-refuerzo")) elRefuerzo.value = reg.personalRefuerzo;
     elApoyo.checked = !!reg.apoyoValidacion;
     actualizarTotalPersonalSorting();
 
     elFijo.oninput = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.personalFijo = Number(this.value) || 0;
-      guardarEstado();
-      actualizarTotalPersonalSorting();
-      actualizarMensajeSorting();
+      var valor = Number(this.value) || 0;
+      var fk = claveFecha(configCache.fecha);
+      escribirConDebounce("pfijo-" + fk + "-" + sesion.turno, hijo(refSorting, fk + "/" + sesion.turno + "/personalFijo"), valor);
+      var totalTxt = valor + (Number(elRefuerzo.value)||0);
+      var el = document.getElementById("sorting-total-personal");
+      if(el) el.textContent = "Total Personal: " + totalTxt + " personas";
     };
     elRefuerzo.oninput = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.personalRefuerzo = Number(this.value) || 0;
-      guardarEstado();
-      actualizarTotalPersonalSorting();
-      actualizarMensajeSorting();
+      var valor = Number(this.value) || 0;
+      var fk = claveFecha(configCache.fecha);
+      escribirConDebounce("prefuerzo-" + fk + "-" + sesion.turno, hijo(refSorting, fk + "/" + sesion.turno + "/personalRefuerzo"), valor);
+      var totalTxt = valor + (Number(elFijo.value)||0);
+      var el = document.getElementById("sorting-total-personal");
+      if(el) el.textContent = "Total Personal: " + totalTxt + " personas";
     };
     elApoyo.onchange = function(){
-      var r = registroSortingActual();
-      if(!r) return;
-      r.apoyoValidacion = this.checked;
-      guardarEstado();
-      actualizarMensajeSorting();
+      var fk = claveFecha(configCache.fecha);
+      escribir(hijo(refSorting, fk + "/" + sesion.turno + "/apoyoValidacion"), this.checked);
     };
   }
 
@@ -2032,9 +1983,9 @@
 
     var lineas = [];
     lineas.push("*REPORTE DE BLOQUES - SORTING*");
-    lineas.push("Turno: " + nombreCortoTurno(estado.turno));
-    lineas.push("Encargado: " + (estado.nombreSorting || "-"));
-    lineas.push("Fecha: " + (estado.fecha || "-"));
+    lineas.push("Turno: " + nombreCortoTurno(sesion.turno));
+    lineas.push("Encargado: " + (sesion.nombre || "-"));
+    lineas.push("Fecha: " + formatearFechaVisible(configCache.fecha));
     lineas.push("Hora de Env\u00edo: " + hhmmss);
     lineas.push("");
     lineas.push("*BLOQUES ENTREGADOS:*");
@@ -2094,10 +2045,7 @@
     }, mensaje);
   });
 
-  /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ==============
-     Independiente de la alarma de armado/cargado de ABInBev. Si algun
-     bloque con hora de corte no esta marcado y ya paso su hora, suena
-     una alerta y ese bloque se resalta en rojo. */
+  /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ============== */
   var alarmaSortingActiva = false;
   var alarmaSortingSonidoId = null;
   var monitorAlarmaSortingId = null;
@@ -2117,7 +2065,7 @@
   }
 
   function verificarAlarmaSorting(){
-    if(rolActual !== "sorting" || !estado || !estado.turno){ detenerAlarmaSorting(); return; }
+    if(sesion.rol !== "sorting" || !sesion.turno){ detenerAlarmaSorting(); return; }
     var reg = registroSortingActual();
     if(!reg){ detenerAlarmaSorting(); return; }
     var hayAtraso = reg.bloques.some(function(b){ return bloqueEstaAtrasado(b); });
@@ -2154,7 +2102,7 @@
 
   /* ============== RENDER GENERAL ============== */
   function render(){
-    if(rolActual === "sorting"){
+    if(sesion.rol === "sorting"){
       renderSorting();
       return;
     }
@@ -2172,22 +2120,25 @@
 
   /* ============== INICIO ============== */
   window.addEventListener("DOMContentLoaded", function(){
-    cargarEstado();
+    var sesionGuardada = leerSesion();
+    if(sesionGuardada && sesionGuardada.rol && sesionGuardada.turno){
+      sesion = sesionGuardada;
+    }
+
     iniciarMonitorAlarma();
     iniciarMonitorAlarmaSorting();
     actualizarRelojSorting();
     setInterval(actualizarRelojSorting, 1000);
-    actualizarDashboardInicio();
+    actualizarDashboardInicio(); // pinta el tablero publico en 0 de inmediato, sin esperar a Firebase
 
-    var sesion = leerSesion(SESSION_KEY);
-    if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
-      mostrarApp(sesion);
-    }
-
-    // Sincronizacion en tiempo real con Firebase: se conecta una sola
-    // vez y desde ahi recibe cada cambio al instante (no hace falta
-    // refrescar la pagina ni encuestar cada cierto tiempo).
+    // Toda la informacion viene de Firebase en tiempo real: se conecta
+    // una sola vez y desde ahi se reciben todos los cambios al instante
+    // (los propios y los de cualquier otra persona conectada al link).
     iniciarEscuchaNube();
+
+    if(sesion.rol === "backus" || sesion.rol === "lavoro" || sesion.rol === "sorting"){
+      mostrarApp(sesion.rol);
+    }
   });
 
 })();
