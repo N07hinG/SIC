@@ -658,7 +658,9 @@
       if(!estado.datosPorTurno[fk][turno]){
         estado.datosPorTurno[fk][turno] = {
           horas: generarHorasPorTurno(turno),
-          transportesProgramados: 74
+          transportesProgramados: 74,
+          nombreBackus: "",
+          nombreLavoro: ""
         };
       }
       return estado.datosPorTurno[fk][turno];
@@ -666,14 +668,14 @@
     if(estado.datosPorTurno[fk] && estado.datosPorTurno[fk][turno]){
       return estado.datosPorTurno[fk][turno];
     }
-    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0 };
+    return { horas: generarHorasPorTurno(turno), transportesProgramados: 0, nombreBackus:"", nombreLavoro:"" };
   }
 
-  // Registro del turno actualmente activo en la sesion (el que se esta
-  // editando ahora mismo). Se crea automaticamente si no existe todavia.
+  // Registro del turno que ESTE dispositivo tiene abierto ahora mismo
+  // (miTurno, local). Se crea automaticamente si no existe todavia.
   function registroActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistro(estado.fecha, estado.turno, true);
+    if(!miTurno) return null;
+    return obtenerRegistro(estado.fecha, miTurno, true);
   }
 
   function calcularAcumuladoRegistro(reg){
@@ -714,7 +716,8 @@
           bloques: bloquesSortingPorDefecto(),
           personalFijo: 12,
           personalRefuerzo: 0,
-          apoyoValidacion: false
+          apoyoValidacion: false,
+          nombreSorting: ""
         };
       }
       return estado.sortingPorTurno[fk][turno];
@@ -722,12 +725,12 @@
     if(estado.sortingPorTurno[fk] && estado.sortingPorTurno[fk][turno]){
       return estado.sortingPorTurno[fk][turno];
     }
-    return { bloques: bloquesSortingPorDefecto(), personalFijo:12, personalRefuerzo:0, apoyoValidacion:false };
+    return { bloques: bloquesSortingPorDefecto(), personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, nombreSorting:"" };
   }
 
   function registroSortingActual(){
-    if(!estado.turno) return null;
-    return obtenerRegistroSorting(estado.fecha, estado.turno, true);
+    if(!miTurno) return null;
+    return obtenerRegistroSorting(estado.fecha, miTurno, true);
   }
 
   // Un bloque esta "atrasado" si tiene hora de corte, no esta marcado, y
@@ -741,9 +744,21 @@
     return ahoraMin >= corteMin;
   }
 
+  /* ============== SESION DE ESTE DISPOSITIVO (NO se sincroniza) ==============
+     Que turno estoy viendo YO ahora mismo y mi nombre son datos de ESTA
+     sesion/dispositivo, no del negocio compartido. Si esto viviera
+     dentro del objeto que se sincroniza por Firebase, el turno de un
+     dispositivo le cambiaria la pantalla a los demas cada vez que
+     alguien guardara algo (el bug que teniamos). Por eso viven aparte,
+     en variables locales + sessionStorage, y NUNCA se escriben en el
+     nodo compartido "estadoApp". */
+  var SESSION_TURNO_KEY = "t2sic_mi_turno";
+  var SESSION_NOMBRE_KEY = "t2sic_mi_nombre";
+  var miTurno = null;
+  var miNombre = "";
+
   function datosPorDefecto(){
     return {
-      turno:"", nombreBackus:"", nombreLavoro:"", nombreSorting:"",
       subarea:"T2", fecha:"", area:"LOG",
       monitoreo:"Unidades cargadas x horas planificadas",
       datosPorTurno:{},
@@ -814,10 +829,7 @@
      mismo instante. */
 
   function nombreUsuarioActualParaNube(){
-    if(rolActual === "backus") return estado.nombreBackus || "";
-    if(rolActual === "lavoro") return estado.nombreLavoro || "";
-    if(rolActual === "sorting") return estado.nombreSorting || "";
-    return "";
+    return miNombre || "";
   }
 
   // Asegura que el objeto tenga toda la forma esperada y una fecha bien
@@ -835,33 +847,33 @@
     if(!resultado.sortingPorTurno || typeof resultado.sortingPorTurno !== "object") resultado.sortingPorTurno = {};
     if(!Array.isArray(resultado.historico)) resultado.historico = [];
     if(!Array.isArray(resultado.planes)) resultado.planes = base.planes;
-    if(resultado.nombreSorting === undefined) resultado.nombreSorting = "";
     return resultado;
   }
 
-  // Toma la version que ACABA de llegar del servidor y le "impone" encima
-  // el turno activo de este dispositivo (mas sus campos de identidad),
-  // para no perder lo que el usuario esta editando ahora mismo. Todo lo
-  // demas (otros turnos, otras fechas) se respeta tal cual esta en el
-  // servidor.
-  function fusionarParaGuardar(servidor, local){
+  // Toma la version que ACABA de llegar del servidor y le "impone"
+  // encima SOLO el registro del turno que ESTE dispositivo tiene abierto
+  // (turnoActivo), para no perder lo que el usuario esta editando ahora
+  // mismo. Todo lo demas (otros turnos, otras fechas) se respeta tal
+  // cual esta en el servidor, para no pisar el trabajo de otros
+  // dispositivos que esten en turnos distintos al mismo tiempo.
+  function fusionarParaGuardar(servidor, local, turnoActivo){
     var resultado = sanearEstado(servidor);
     if(!local) return resultado;
 
-    ["turno","fecha","subarea","area","monitoreo","nombreBackus","nombreLavoro","nombreSorting","planes","historico"].forEach(function(campo){
+    ["fecha","subarea","area","monitoreo","planes","historico"].forEach(function(campo){
       if(local[campo] !== undefined) resultado[campo] = local[campo];
     });
     resultado.fecha = normalizarFechaVisual(resultado.fecha);
 
     var fk = claveFecha(resultado.fecha);
-    if(local.turno){
-      if(local.datosPorTurno && local.datosPorTurno[fk] && local.datosPorTurno[fk][local.turno]){
+    if(turnoActivo){
+      if(local.datosPorTurno && local.datosPorTurno[fk] && local.datosPorTurno[fk][turnoActivo]){
         if(!resultado.datosPorTurno[fk]) resultado.datosPorTurno[fk] = {};
-        resultado.datosPorTurno[fk][local.turno] = local.datosPorTurno[fk][local.turno];
+        resultado.datosPorTurno[fk][turnoActivo] = local.datosPorTurno[fk][turnoActivo];
       }
-      if(local.sortingPorTurno && local.sortingPorTurno[fk] && local.sortingPorTurno[fk][local.turno]){
+      if(local.sortingPorTurno && local.sortingPorTurno[fk] && local.sortingPorTurno[fk][turnoActivo]){
         if(!resultado.sortingPorTurno[fk]) resultado.sortingPorTurno[fk] = {};
-        resultado.sortingPorTurno[fk][local.turno] = local.sortingPorTurno[fk][local.turno];
+        resultado.sortingPorTurno[fk][turnoActivo] = local.sortingPorTurno[fk][turnoActivo];
       }
     }
     return resultado;
@@ -882,7 +894,7 @@
     if(!rolActual || !dbEstadoRef){ huboEdicionLocalPendiente = false; return; }
     nubeGuardandoAhora = true;
     dbEstadoRef.once("value").then(function(snapshot){
-      var fusionado = fusionarParaGuardar(snapshot.val(), datosLocales);
+      var fusionado = fusionarParaGuardar(snapshot.val(), datosLocales, miTurno);
       estado = fusionado;
       return dbEstadoRef.set(fusionado);
     }).then(function(){
@@ -906,7 +918,7 @@
       var nombreNodo = rolActual === "backus" ? "BACKUS" : (rolActual === "sorting" ? "SORTING" : "EXTERNO");
       var registro = {
         fecha: estado.fecha || "",
-        turno: estado.turno || "",
+        turno: miTurno || "",
         usuario: nombreUsuarioActualParaNube(),
         comentario_status: mensajeExacto || "",
         timestamp: Date.now()
@@ -914,7 +926,7 @@
       if(camposReporte && typeof camposReporte === "object"){
         Object.keys(camposReporte).forEach(function(k){ registro[k] = camposReporte[k]; });
       }
-      var claveFila = (estado.fecha||"x") + "_" + (estado.turno||"x") + "_" + (registro.hora_reporte||"sinhora");
+      var claveFila = (estado.fecha||"x") + "_" + (miTurno||"x") + "_" + (registro.hora_reporte||"sinhora");
       claveFila = claveFila.replace(/[.#$\[\]\/\s]/g, "-");
       firebase.database().ref("reportes/" + nombreNodo + "/" + claveFila).set(registro).catch(function(err){
         console.error("No se pudo enviar el reporte de status a Firebase:", err);
@@ -1037,22 +1049,28 @@
       }
       err.textContent = "";
       if(!estado) cargarEstado();
-      estado.turno = turno;
+      miTurno = turno;
+      miNombre = nombre;
       // Cada rol guarda su propio registro, por su propia clave
-      // fecha+turno. Nunca se mezclan entre si.
+      // fecha+turno. Nunca se mezclan entre si. El nombre del
+      // responsable se guarda DENTRO del registro de ese turno (no en
+      // un campo global), para que no se cruce con el nombre de otro
+      // dispositivo que este en otro turno al mismo tiempo.
       if(rolSeleccionado === "backus"){
-        estado.nombreBackus = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
+        var regB = obtenerRegistro(estado.fecha, turno, true);
+        regB.nombreBackus = nombre;
       } else if(rolSeleccionado === "sorting"){
-        estado.nombreSorting = nombre;
-        obtenerRegistroSorting(estado.fecha, turno, true);
+        var regS = obtenerRegistroSorting(estado.fecha, turno, true);
+        regS.nombreSorting = nombre;
       } else {
-        estado.nombreLavoro = nombre;
-        obtenerRegistro(estado.fecha, turno, true);
+        var regL = obtenerRegistro(estado.fecha, turno, true);
+        regL.nombreLavoro = nombre;
       }
       horaSelIdx = 0;
       guardarEstado();
       guardarSesion(SESSION_KEY, rolSeleccionado);
+      guardarSesion(SESSION_TURNO_KEY, turno);
+      guardarSesion(SESSION_NOMBRE_KEY, nombre);
       mostrarApp(rolSeleccionado);
     }catch(e){
       err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
@@ -1071,8 +1089,12 @@
 
   function cerrarSesion(){
     borrarSesion(SESSION_KEY);
+    borrarSesion(SESSION_TURNO_KEY);
+    borrarSesion(SESSION_NOMBRE_KEY);
     rolActual = null;
     rolSeleccionado = null;
+    miTurno = null;
+    miNombre = "";
     document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
@@ -1089,9 +1111,9 @@
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
 
   document.getElementById("btn-reset").addEventListener("click", function(){
-    if(!estado || !estado.turno) return;
+    if(!estado || !miTurno) return;
     var ok = confirm(
-      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(estado.turno) + ") a cero:\n\n" +
+      "Esto va a reiniciar el reporte del turno ACTUAL (" + nombreCortoTurno(miTurno) + ") a cero:\n\n" +
       "- Transportes programados de este turno\n" +
       "- Armados y Cargados de todas las horas de este turno\n\n" +
       "Los datos de los OTROS turnos y el hist\u00f3rico ya guardado NO se borran.\n\n" +
@@ -1101,9 +1123,12 @@
 
     var fk = claveFecha(estado.fecha);
     if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-    estado.datosPorTurno[fk][estado.turno] = {
-      horas: generarHorasPorTurno(estado.turno),
-      transportesProgramados: 74
+    var regAnterior = estado.datosPorTurno[fk][miTurno] || {};
+    estado.datosPorTurno[fk][miTurno] = {
+      horas: generarHorasPorTurno(miTurno),
+      transportesProgramados: 74,
+      nombreBackus: regAnterior.nombreBackus || miNombre || "",
+      nombreLavoro: regAnterior.nombreLavoro || ""
     };
     horaSelIdx = 0;
 
@@ -1128,7 +1153,7 @@
       estado.fecha = this.value; guardarEstado();
       // Cambiar de fecha mueve el contexto a otro registro (fecha+turno);
       // nunca mezcla datos entre fechas ni entre turnos.
-      obtenerRegistro(estado.fecha, estado.turno, true);
+      obtenerRegistro(estado.fecha, miTurno, true);
       horaSelIdx = 0;
       bindInfoLavoro();
       renderHorasGrid();
@@ -1161,7 +1186,7 @@
 
   /* ============== INFO SIMPLE (Lavoro) ============== */
   function bindInfoLavoro(){
-    document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
+    document.getElementById("lv-turno").textContent = nombreCortoTurno(miTurno);
     document.getElementById("lv-fecha").textContent = estado.fecha || "-";
   }
 
@@ -1173,8 +1198,8 @@
     var meta = reg ? reg.transportesProgramados : 0;
     var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
     return "STATUS DE CARGA\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(miTurno) + "\n" +
+      "Supervisor: " + ((reg && reg.nombreBackus) || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
@@ -1222,8 +1247,8 @@
     var meta = reg ? (reg.transportesProgramados || 0) : 0;
     var pctArmado = meta > 0 ? Math.round(((h.acumArmado||0)/meta)*100) : 0;
     return "STATUS DE ARMADO\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Encargado: " + (estado.nombreLavoro || "-") + "\n" +
+      "Turno: " + nombreCortoTurno(miTurno) + "\n" +
+      "Encargado: " + ((reg && reg.nombreLavoro) || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
       "Fecha: " + (estado.fecha || "-") + "\n" +
       "Hora: " + (h.hora || "-") + "\n" +
@@ -1320,7 +1345,7 @@
     document.getElementById("d-armado").value = h.armado || 0;
     var elCargado = document.getElementById("d-cargado");
     elCargado.value = h.cargado || 0;
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
+    if(cargadoBloqueadoEnHora(miTurno, h.hora)){
       elCargado.disabled = true;
       elCargado.title = "No se permite registrar Cargados a la 1:00 am (Turno Noche).";
     } else {
@@ -1366,7 +1391,7 @@
     var reg = registroActual();
     if(!reg) return;
     var h = reg.horas[horaSelIdx];
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
+    if(cargadoBloqueadoEnHora(miTurno, h.hora)){
       // Bloqueo duro por si el input llega a habilitarse por otra via.
       this.value = h.cargado || 0;
       toast("No se permite registrar Cargados a la 1:00 am (Turno Noche).");
@@ -1666,9 +1691,9 @@
       ts: Date.now(),
       fecha: estado.fecha,
       hora: h.hora,
-      turno: estado.turno,
-      supervisor: estado.nombreBackus,
-      encargadoArmado: estado.nombreLavoro,
+      turno: miTurno,
+      supervisor: reg.nombreBackus,
+      encargadoArmado: reg.nombreLavoro,
       subarea: estado.subarea,
       area: estado.area,
       transportesProgramados: reg.transportesProgramados,
@@ -1683,7 +1708,7 @@
     // dos turnos distintos con la misma hora del dia NUNCA se pisen.
     var idx = lista.findIndex(function(r){
       return String(r.fecha).trim() === String(estado.fecha).trim() &&
-             String(r.turno||"").trim() === String(estado.turno||"").trim() &&
+             String(r.turno||"").trim() === String(miTurno||"").trim() &&
              String(r.hora).trim() === String(h.hora).trim();
     });
     if(idx >= 0) lista[idx] = registro; else lista.push(registro);
@@ -1712,7 +1737,7 @@
         '<span class="hist-info">'+escapeAttr(nombreCortoTurno(r.turno))+' &middot; '+escapeAttr(r.supervisor||"")+' &middot; '+cargadoMostrar+'/'+(r.transportesProgramados||0)+'</span>'+
         '<span class="hist-pct" style="color:'+color+'">'+pct+'%</span>';
       item.addEventListener("click", function(){
-        if(!r.turno || r.turno !== estado.turno){
+        if(!r.turno || r.turno !== miTurno){
           toast("Ese registro es de otro turno (" + nombreCortoTurno(r.turno) + "). Ingresa a ese turno para editarlo.");
           return;
         }
@@ -1745,10 +1770,10 @@
   // Minutos transcurridos desde el inicio del turno hasta AHORA,
   // manejando el cruce de medianoche (ej. turno nocturno).
   function minutosDesdeInicioTurno(){
-    if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
+    if(!TURNO_INICIO.hasOwnProperty(miTurno)) return null;
     var ahora = new Date();
     var actualMin = ahora.getHours()*60 + ahora.getMinutes();
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var inicioMin = TURNO_INICIO[miTurno]*60;
     var diff = actualMin - inicioMin;
     if(diff < 0) diff += 24*60;
     return diff;
@@ -1757,10 +1782,10 @@
   // Minutos desde el inicio del turno hasta su hora de corte, manejando
   // el cruce de medianoche.
   function minutosDesdeInicioHastaCorte(){
-    if(!estado || !TURNO_CORTE[estado.turno] || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var corte = TURNO_CORTE[estado.turno];
+    if(!TURNO_CORTE[miTurno] || !TURNO_INICIO.hasOwnProperty(miTurno)) return null;
+    var corte = TURNO_CORTE[miTurno];
     var corteMin = corte.h*60 + corte.m;
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
+    var inicioMin = TURNO_INICIO[miTurno]*60;
     var diff = corteMin - inicioMin;
     if(diff < 0) diff += 24*60;
     return diff;
@@ -1777,7 +1802,7 @@
   }
 
   function pctCumplimientoActual(){
-    if(!estado || !estado.turno) return 0;
+    if(!miTurno) return 0;
     calcularPorcentajes();
     var reg = registroActual();
     if(!reg || !reg.horas.length) return 0;
@@ -1802,15 +1827,15 @@
   }
 
   // Caja DENTRO de la app (ABInBev / c-plan-accion): siempre refleja el
-  // turno REAL de la sesion activa (estado.turno) y la alarma real.
+  // turno REAL de este dispositivo (miTurno) y la alarma real.
   function actualizarPlanAccionApp(){
     var caja = document.getElementById("c-plan-accion");
     if(!caja) return;
     if(alarmaActiva){
       caja.value = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
       caja.classList.add("alerta");
-    } else if(estado && estado.turno && TURNO_CORTE[estado.turno]){
-      var corte = TURNO_CORTE[estado.turno];
+    } else if(miTurno && TURNO_CORTE[miTurno]){
+      var corte = TURNO_CORTE[miTurno];
       var hh = String(corte.h).padStart(2,"0");
       var mm = String(corte.m).padStart(2,"0");
       caja.value = "OK \u00b7 corte " + hh + ":" + mm;
@@ -1836,7 +1861,7 @@
       caja.classList.remove("alerta");
       return;
     }
-    var esElTurnoConAlarma = alarmaActiva && estado && estado.turno === turnoVisto;
+    var esElTurnoConAlarma = alarmaActiva && miTurno === turnoVisto;
     if(esElTurnoConAlarma){
       caja.textContent = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
       caja.classList.add("alerta");
@@ -1875,7 +1900,7 @@
   }
 
   function verificarAlarma(){
-    if(!estado || !estado.turno) { actualizarUIPlanAccion(); return; }
+    if(!miTurno) { actualizarUIPlanAccion(); return; }
     if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){
       dispararAlarma();
     } else {
@@ -2077,8 +2102,8 @@
 
     var lineas = [];
     lineas.push("*REPORTE DE BLOQUES - SORTING*");
-    lineas.push("Turno: " + nombreCortoTurno(estado.turno));
-    lineas.push("Encargado: " + (estado.nombreSorting || "-"));
+    lineas.push("Turno: " + nombreCortoTurno(miTurno));
+    lineas.push("Encargado: " + (reg.nombreSorting || "-"));
     lineas.push("Fecha: " + (estado.fecha || "-"));
     lineas.push("Hora de Env\u00edo: " + hhmmss);
     lineas.push("");
@@ -2162,7 +2187,7 @@
   }
 
   function verificarAlarmaSorting(){
-    if(rolActual !== "sorting" || !estado || !estado.turno){ detenerAlarmaSorting(); return; }
+    if(rolActual !== "sorting" || !miTurno){ detenerAlarmaSorting(); return; }
     var reg = registroSortingActual();
     if(!reg){ detenerAlarmaSorting(); return; }
     var hayAtraso = reg.bloques.some(function(b){ return bloqueEstaAtrasado(b); });
@@ -2226,6 +2251,8 @@
 
     var sesion = leerSesion(SESSION_KEY);
     if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
+      miTurno = leerSesion(SESSION_TURNO_KEY) || null;
+      miNombre = leerSesion(SESSION_NOMBRE_KEY) || "";
       mostrarApp(sesion);
     }
 
