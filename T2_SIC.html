@@ -564,9 +564,7 @@
   "use strict";
 
   /* ============== CLAVES DE ALMACENAMIENTO ============== */
-  var SESSION_KEY = "t2sic_session"; // guarda el ROL activo: "backus" | "lavoro"
-  var DATA_KEY = "t2sic_data";
-  var HIST_KEY = "t2sic_historico";
+  var SESSION_KEY = "t2sic_session"; // guarda el ROL activo en ESTA pestana (no es "dato", es solo sesion de login)
 
   /* ============== BACKEND EN LA NUBE (Firebase Realtime Database) ============== */
   var firebaseConfig = {
@@ -584,7 +582,7 @@
     firebaseApp = firebase.initializeApp(firebaseConfig);
     dbEstadoRef = firebase.database().ref("estadoApp");
   }catch(e){
-    console.error("No se pudo inicializar Firebase (se sigue usando localStorage):", e);
+    console.error("No se pudo inicializar Firebase. La app no podra sincronizar datos entre dispositivos:", e);
   }
 
   var nubeGuardarTimeoutId = null;
@@ -593,10 +591,8 @@
 
   var TURNOS_VALIDOS = ["Turno 1 - Ma\u00f1ana","Turno 2 - Tarde","Turno 3 - Nocturno"];
 
-  /* ============== ALMACENAMIENTO SEGURO ============== */
-  var memoria = {}, memoriaSesion = {};
-  function guardarValor(key, val){ try{ localStorage.setItem(key, val); }catch(e){ memoria[key] = val; } }
-  function leerValor(key){ try{ return localStorage.getItem(key); }catch(e){ return (key in memoria) ? memoria[key] : null; } }
+  /* ============== SESION DE LOGIN (device-local, no es "dato" del negocio) ============== */
+  var memoriaSesion = {};
   function guardarSesion(key, val){ try{ sessionStorage.setItem(key, val); }catch(e){ memoriaSesion[key] = val; } }
   function leerSesion(key){ try{ return sessionStorage.getItem(key); }catch(e){ return (key in memoriaSesion) ? memoriaSesion[key] : null; } }
   function borrarSesion(key){ try{ sessionStorage.removeItem(key); }catch(e){} delete memoriaSesion[key]; }
@@ -752,6 +748,7 @@
       monitoreo:"Unidades cargadas x horas planificadas",
       datosPorTurno:{},
       sortingPorTurno:{},
+      historico:[],
       planes:[
         {n:1,accion:"Solicitar apoyo a T1 con operarios y FLT"},
         {n:2,accion:"Solicitar al CD amplitud de VH por salida tard\u00eda"},
@@ -772,52 +769,102 @@
     return dd+"/"+mm+"/"+yy;
   }
 
+  // Blindaje contra fechas mal formadas (por ejemplo si algun dispositivo
+  // llego a guardar un objeto Date/ISO como "2026-04-14T05:00:00.000Z" en
+  // vez de texto "dd/mm/aaaa"). Si detecta ese formato, lo convierte; si
+  // no reconoce nada valido, usa la fecha de hoy.
+  function normalizarFechaVisual(valor){
+    var s = String(valor == null ? "" : valor).trim();
+    if(!s) return fechaHoyStr();
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    return s; // formato libre escrito a mano: se respeta tal cual
+  }
+
+  // Ya NO se lee de localStorage. El estado arranca siempre en cero
+  // (datosPorDefecto) y, apenas Firebase responda (casi al instante),
+  // iniciarEscuchaNube() lo reemplaza con el dato REAL y compartido.
+  // Esto evita que un dispositivo con una copia vieja/local sobreescriba
+  // por accidente lo que los demas ya avanzaron.
   function cargarEstado(){
-    try{
-      var raw = leerValor(DATA_KEY);
-      if(raw){ estado = JSON.parse(raw); }
-      else { estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    }catch(e){ estado = datosPorDefecto(); estado.fecha = fechaHoyStr(); }
-    if(!estado.fecha) estado.fecha = fechaHoyStr();
-    if(!estado.datosPorTurno) estado.datosPorTurno = {};
-    if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-    if(estado.nombreSorting === undefined) estado.nombreSorting = "";
-    // Migracion de formato antiguo (una sola tabla de horas compartida
-    // para todos los turnos) hacia el nuevo formato separado por turno.
-    if(estado.horas && estado.horas.length && estado.turno){
-      var fk = claveFecha(estado.fecha);
-      if(!estado.datosPorTurno[fk]) estado.datosPorTurno[fk] = {};
-      if(!estado.datosPorTurno[fk][estado.turno]){
-        estado.datosPorTurno[fk][estado.turno] = {
-          horas: estado.horas,
-          transportesProgramados: estado.transportesProgramados || 74
-        };
-      }
-    }
-    delete estado.horas;
-    delete estado.transportesProgramados;
+    estado = datosPorDefecto();
+    estado.fecha = fechaHoyStr();
   }
 
   function guardarEstado(){
-    try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
     guardarEnNube(estado);
   }
-  function cargarHistorico(){ try{ var raw = leerValor(HIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; } }
-  function guardarHistorico(lista){ try{ guardarValor(HIST_KEY, JSON.stringify(lista)); }catch(e){} }
+  function cargarHistorico(){ return (estado && estado.historico) || []; }
+  function guardarHistorico(lista){
+    estado.historico = lista;
+    guardarEstado();
+  }
 
   /* ============== SINCRONIZACION EN LA NUBE (Firebase Realtime Database) ==============
-     localStorage sigue siendo la copia inmediata y segura (nunca se
-     deja de escribir ahi). Ademas, se manda TODO el estado actual a
-     Firebase, para que cualquier dispositivo pueda leer la misma
-     informacion al instante (sin necesidad de refrescar la pagina).
-     Si la red falla, los datos ya quedaron a salvo en localStorage y
-     no se pierde nada. */
+     Firebase es la UNICA fuente de verdad: no hay copia local en disco.
+     Cada dispositivo mantiene en memoria (variable "estado") lo ultimo
+     que recibio de Firebase mas sus propios cambios sin guardar todavia.
+
+     Para evitar que dos personas editando TURNOS DISTINTOS al mismo
+     tiempo se borren datos entre si, antes de escribir se vuelve a leer
+     la version mas reciente del servidor y se fusiona: cada dispositivo
+     solo "impone" su propio turno activo (y sus campos de identidad),
+     dejando intactos los turnos/fechas que otros esten editando en ese
+     mismo instante. */
 
   function nombreUsuarioActualParaNube(){
     if(rolActual === "backus") return estado.nombreBackus || "";
     if(rolActual === "lavoro") return estado.nombreLavoro || "";
     if(rolActual === "sorting") return estado.nombreSorting || "";
     return "";
+  }
+
+  // Asegura que el objeto tenga toda la forma esperada y una fecha bien
+  // formada, sin importar de donde haya venido (Firebase, valor local,
+  // etc.). Se usa SIEMPRE que "estado" se reemplaza por completo.
+  function sanearEstado(obj){
+    var base = datosPorDefecto();
+    var limpio = (obj && typeof obj === "object") ? obj : {};
+    var resultado = {};
+    Object.keys(base).forEach(function(campo){
+      resultado[campo] = (limpio[campo] !== undefined) ? limpio[campo] : base[campo];
+    });
+    resultado.fecha = normalizarFechaVisual(resultado.fecha);
+    if(!resultado.datosPorTurno || typeof resultado.datosPorTurno !== "object") resultado.datosPorTurno = {};
+    if(!resultado.sortingPorTurno || typeof resultado.sortingPorTurno !== "object") resultado.sortingPorTurno = {};
+    if(!Array.isArray(resultado.historico)) resultado.historico = [];
+    if(!Array.isArray(resultado.planes)) resultado.planes = base.planes;
+    if(resultado.nombreSorting === undefined) resultado.nombreSorting = "";
+    return resultado;
+  }
+
+  // Toma la version que ACABA de llegar del servidor y le "impone" encima
+  // el turno activo de este dispositivo (mas sus campos de identidad),
+  // para no perder lo que el usuario esta editando ahora mismo. Todo lo
+  // demas (otros turnos, otras fechas) se respeta tal cual esta en el
+  // servidor.
+  function fusionarParaGuardar(servidor, local){
+    var resultado = sanearEstado(servidor);
+    if(!local) return resultado;
+
+    ["turno","fecha","subarea","area","monitoreo","nombreBackus","nombreLavoro","nombreSorting","planes","historico"].forEach(function(campo){
+      if(local[campo] !== undefined) resultado[campo] = local[campo];
+    });
+    resultado.fecha = normalizarFechaVisual(resultado.fecha);
+
+    var fk = claveFecha(resultado.fecha);
+    if(local.turno){
+      if(local.datosPorTurno && local.datosPorTurno[fk] && local.datosPorTurno[fk][local.turno]){
+        if(!resultado.datosPorTurno[fk]) resultado.datosPorTurno[fk] = {};
+        resultado.datosPorTurno[fk][local.turno] = local.datosPorTurno[fk][local.turno];
+      }
+      if(local.sortingPorTurno && local.sortingPorTurno[fk] && local.sortingPorTurno[fk][local.turno]){
+        if(!resultado.sortingPorTurno[fk]) resultado.sortingPorTurno[fk] = {};
+        resultado.sortingPorTurno[fk][local.turno] = local.sortingPorTurno[fk][local.turno];
+      }
+    }
+    return resultado;
   }
 
   // Guarda con un pequeno "debounce": si el usuario esta escribiendo
@@ -828,17 +875,21 @@
     if(!rolActual || !dbEstadoRef) return; // sin sesion activa o sin Firebase, no hay nada que sincronizar
     huboEdicionLocalPendiente = true;
     if(nubeGuardarTimeoutId) clearTimeout(nubeGuardarTimeoutId);
-    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 800);
+    nubeGuardarTimeoutId = setTimeout(function(){ enviarANube(datos); }, 600);
   }
 
-  function enviarANube(datos){
+  function enviarANube(datosLocales){
     if(!rolActual || !dbEstadoRef){ huboEdicionLocalPendiente = false; return; }
     nubeGuardandoAhora = true;
-    dbEstadoRef.set(datos).then(function(){
+    dbEstadoRef.once("value").then(function(snapshot){
+      var fusionado = fusionarParaGuardar(snapshot.val(), datosLocales);
+      estado = fusionado;
+      return dbEstadoRef.set(fusionado);
+    }).then(function(){
       nubeGuardandoAhora = false;
       huboEdicionLocalPendiente = false;
     }).catch(function(err){
-      console.error("No se pudo guardar en Firebase (se mantiene en localStorage):", err);
+      console.error("No se pudo guardar en Firebase:", err);
       nubeGuardandoAhora = false;
       huboEdicionLocalPendiente = false;
     });
@@ -885,20 +936,14 @@
       var val = snapshot.val();
       if(!val) return;
 
-      estado = val;
-      if(!estado.fecha) estado.fecha = fechaHoyStr();
-      if(!estado.datosPorTurno) estado.datosPorTurno = {};
-      if(!estado.sortingPorTurno) estado.sortingPorTurno = {};
-      if(estado.nombreSorting === undefined) estado.nombreSorting = "";
-
-      try{ guardarValor(DATA_KEY, JSON.stringify(estado)); }catch(e){}
+      estado = sanearEstado(val);
 
       if(document.getElementById("vista-app").style.display !== "none"){
         render();
       }
       actualizarDashboardInicio();
     }, function(err){
-      console.error("No se pudo escuchar cambios en Firebase (se sigue usando localStorage):", err);
+      console.error("No se pudo escuchar cambios en Firebase:", err);
     });
   }
 
