@@ -455,11 +455,6 @@
     </section>
 
     <section class="panel solo-sorting">
-      <div class="panel-title small">Avance de Meta Diaria<span class="tag" id="sorting-meta-tag">0 / 35,000</span></div>
-      <div class="sorting-meta-barra-wrap"><div class="sorting-meta-barra" id="sorting-meta-barra"></div></div>
-    </section>
-
-    <section class="panel solo-sorting">
       <div class="panel-title small">Fuerza Laboral</div>
       <div class="grid2">
         <div class="campo-mini"><label>Personal Fijo</label><input id="sorting-personal-fijo" inputmode="numeric" value="12"></div>
@@ -586,7 +581,15 @@
     "Turno 3 - Nocturno": {h:2, m:59}
   };
 
-  var META_SORTING = 35000;
+  // Lista fija de bloques de Sorting (ya no se guardan por turno en Firebase:
+  // solo son opciones de seleccion). Orden exacto pedido, sin "Bloque 1".
+  var BLOQUES_SORTING = [
+    { nombre:"Bloque 4" },
+    { nombre:"Bloque 3" },
+    { nombre:"Bloque 2" },
+    { nombre:"Bloque extra" },
+    { nombre:"FILA 4" }
+  ];
 
   function horaLabel(h24){
     var h = ((h24 % 24) + 24) % 24;
@@ -607,27 +610,6 @@
       Object.keys(horas).forEach(function(k){
         var i = Number(k);
         if(!isNaN(i) && base[i]) base[i] = Object.assign({}, base[i], horas[k]);
-      });
-    }
-    return base;
-  }
-  function bloquesSortingPorDefecto(){
-    return [
-      { id:1, nombre:"Bloque 1", entrega:"10:00am", entregaVacia:false, nota:"Lo usa T1", corteH:10, corteM:0,  marcado:false, cajas:0 },
-      { id:2, nombre:"Bloque 2", entrega:"1:30pm",  entregaVacia:false, nota:"",          corteH:13, corteM:30, marcado:false, cajas:0 },
-      { id:3, nombre:"Bloque 3", entrega:"3:45pm",  entregaVacia:false, nota:"",          corteH:15, corteM:45, marcado:false, cajas:0 },
-      { id:4, nombre:"Bloque 4", entrega:"",        entregaVacia:true,  nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:5, nombre:"Bloque 5", entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 },
-      { id:6, nombre:"Fila 4",   entrega:"",        entregaVacia:false, nota:"",          corteH:null, corteM:null, marcado:false, cajas:0 }
-    ];
-  }
-  function normalizarBloques(bloques){
-    if(Array.isArray(bloques) && bloques.length === 6) return bloques;
-    var base = bloquesSortingPorDefecto();
-    if(bloques && typeof bloques === "object"){
-      Object.keys(bloques).forEach(function(k){
-        var i = Number(k);
-        if(!isNaN(i) && base[i]) base[i] = Object.assign({}, base[i], bloques[k]);
       });
     }
     return base;
@@ -718,6 +700,7 @@
 
   var refComun = null, refRegistrosFecha = null, refSortingFecha = null, refHistorico = null;
   var fechaSuscrita = null;
+  var fechaSortingSuscrita = null; // Sorting usa el reloj en vivo, no la fecha de ABInBev/Externo
 
   /* ============== ESTADO DE CONEXION ============== */
   firebase.database().ref(".info/connected").on("value", function(snap){
@@ -776,7 +759,6 @@
     fechaSuscrita = claveF;
 
     if(refRegistrosFecha) refRegistrosFecha.off();
-    if(refSortingFecha) refSortingFecha.off();
 
     refRegistrosFecha = db.ref("registros/" + claveF);
     refRegistrosFecha.on("value", function(snap){
@@ -784,7 +766,30 @@
       if(rolActual === "backus" || rolActual === "lavoro"){ render(); }
       if(!rolActual){ actualizarDashboardInicio(); }
     });
+  }
 
+  // Sorting: la fecha/hora "oficial" es el reloj en vivo del propio
+  // aplicativo, no el campo Fecha que edita ABInBev en la cabecera. Asi
+  // Sorting queda totalmente independiente de ese apartado.
+  function fechaLiveStr(){
+    var d = new Date();
+    var dd = String(d.getDate()).padStart(2,"0");
+    var mm = String(d.getMonth()+1).padStart(2,"0");
+    var yy = d.getFullYear();
+    return dd+"/"+mm+"/"+yy;
+  }
+  function horaLiveStr(){
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2,"0");
+    var mi = String(d.getMinutes()).padStart(2,"0");
+    var ss = String(d.getSeconds()).padStart(2,"0");
+    return hh+":"+mi+":"+ss;
+  }
+  function suscribirFechaSorting(){
+    var claveF = fk(fechaLiveStr());
+    if(fechaSortingSuscrita === claveF) return;
+    fechaSortingSuscrita = claveF;
+    if(refSortingFecha) refSortingFecha.off();
     refSortingFecha = db.ref("sorting/" + claveF);
     refSortingFecha.on("value", function(snap){
       cacheSorting = snap.val() || {};
@@ -813,13 +818,13 @@
       }
     });
   }
-  function asegurarRegistroSortingExiste(turnoNombre, fecha){
+  function asegurarRegistroSortingExiste(turnoNombre){
     var turnoId = TURNO_ID[turnoNombre];
-    var claveF = fk(fecha);
+    var claveF = fk(fechaLiveStr());
     var ref = db.ref("sorting/"+claveF+"/"+turnoId);
     ref.once("value").then(function(snap){
       if(!snap.exists()){
-        ref.set({ personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, bloques: bloquesSortingPorDefecto() });
+        ref.set({ personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"" });
       }
     });
   }
@@ -845,12 +850,12 @@
     if(!estado.turno) return null;
     var turnoId = TURNO_ID[estado.turno];
     var r = cacheSorting[turnoId];
-    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, bloques: bloquesSortingPorDefecto() };
+    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"" };
     return {
       personalFijo: (r.personalFijo!==undefined? r.personalFijo:12),
       personalRefuerzo: (r.personalRefuerzo!==undefined? r.personalRefuerzo:0),
       apoyoValidacion: !!r.apoyoValidacion,
-      bloques: normalizarBloques(r.bloques)
+      seleccion: (r.seleccion!==undefined && r.seleccion!==null) ? r.seleccion : ""
     };
   }
 
@@ -861,18 +866,9 @@
     return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
   }
 
-  function bloqueEstaAtrasado(bloque){
-    if(bloque.corteH === null || bloque.corteH === undefined) return false;
-    if(bloque.marcado) return false;
-    var ahora = new Date();
-    var ahoraMin = ahora.getHours()*60 + ahora.getMinutes();
-    var corteMin = bloque.corteH*60 + (bloque.corteM||0);
-    return ahoraMin >= corteMin;
-  }
-
   /* ============== ESCRITURAS A FIREBASE (por campo, no se pisan entre roles) ============== */
   function rutaRegistro(campo){ return "registros/"+fk(estado.fecha)+"/"+TURNO_ID[estado.turno]+"/"+campo; }
-  function rutaSorting(campo){ return "sorting/"+fk(estado.fecha)+"/"+TURNO_ID[estado.turno]+"/"+campo; }
+  function rutaSorting(campo){ return "sorting/"+fk(fechaLiveStr())+"/"+TURNO_ID[estado.turno]+"/"+campo; }
 
   var guardarComunSubarea = debounce(function(v){ db.ref("comun/subarea").set(v); }, 400);
   var guardarComunArea = debounce(function(v){ db.ref("comun/area").set(v); }, 400);
@@ -947,7 +943,7 @@
         asegurarRegistroExiste(turno, estado.fecha);
       } else if(rolSeleccionado === "sorting"){
         estado.nombreSorting = nombre;
-        asegurarRegistroSortingExiste(turno, estado.fecha);
+        asegurarRegistroSortingExiste(turno);
       } else {
         estado.nombreLavoro = nombre;
         asegurarRegistroExiste(turno, estado.fecha);
@@ -982,7 +978,6 @@
     document.getElementById("login-error-generico").textContent = "";
     elFormLogin.classList.remove("open");
     cerrarMenuUsuario();
-    detenerAlarmaSorting();
     actualizarDashboardInicio();
   }
   document.getElementById("btn-logout").addEventListener("click", cerrarSesion);
@@ -1018,7 +1013,6 @@
       estado.fecha = this.value;
       guardarComunFecha(this.value);
       asegurarRegistroExiste(estado.turno, this.value);
-      if(rolActual === "sorting") asegurarRegistroSortingExiste(estado.turno, this.value);
       horaSelIdx = 0;
     };
     document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarComunArea(this.value); };
@@ -1622,6 +1616,7 @@
 
   /* ============== SORTING: RELOJ EN TIEMPO REAL ============== */
   function actualizarRelojSorting(){
+    suscribirFechaSorting(); // el reloj es la fuente oficial de fecha para Sorting
     var el = document.getElementById("sorting-reloj");
     if(!el) return;
     var d = new Date();
@@ -1634,95 +1629,41 @@
     el.textContent = dd + "/" + mm + "/" + yy + " \u00b7 " + hh + ":" + mi + ":" + ss;
   }
 
-  /* ============== SORTING: LISTA DE BLOQUES (en vivo) ============== */
+  /* ============== SORTING: LISTA DE BLOQUES (en vivo) ==============
+     El check YA NO se guarda dentro del objeto del bloque (eso era lo que
+     provocaba que, al marcar varios de golpe, se corrompiera el nombre y
+     quedara en "undefined"/"0" para todos). Ahora el check solo escribe
+     un campo escalar suelto: sorting/{fecha}/{turno}/seleccion = "Nombre
+     del bloque". Como es un unico valor, nunca puede haber mas de un
+     bloque marcado a la vez -> queda descartado por diseno el "marcar
+     todo de golpe sin querer". */
   function renderBloques(){
     var reg = registroSortingActual();
     var cont = document.getElementById("bloques-lista");
     if(!reg || !cont) return;
-    var enfocadoIdx = -1;
-    var enfocado = document.activeElement;
-    if(enfocado && enfocado.classList && enfocado.classList.contains("bloque-cajas")) enfocadoIdx = Number(enfocado.dataset.i);
-    if(enfocadoIdx >= 0){
-      // no reconstruimos el input donde el usuario esta escribiendo ahora mismo
-      cont.querySelectorAll(".bloque-item").forEach(function(fila, i){
-        if(i === enfocadoIdx) return;
-        var b = reg.bloques[i];
-        if(!b) return;
-        var atrasado = bloqueEstaAtrasado(b);
-        fila.classList.toggle("atrasado", atrasado);
-        var chk = fila.querySelector(".bloque-chk");
-        if(chk && chk.checked !== b.marcado) chk.checked = b.marcado;
-        var cajasInp = fila.querySelector(".bloque-cajas");
-        if(cajasInp){
-          cajasInp.disabled = !b.marcado;
-          fijarSiNoEnfocado(cajasInp, b.cajas || 0);
-        }
-      });
-      return;
-    }
     cont.innerHTML = "";
-    reg.bloques.forEach(function(b, i){
-      var atrasado = bloqueEstaAtrasado(b);
-      var detalle = [];
-      if(b.entregaVacia) detalle.push("Entrega [ ]");
-      else if(b.entrega) detalle.push("Entrega " + b.entrega);
-      if(b.nota) detalle.push(b.nota);
+    BLOQUES_SORTING.forEach(function(b){
+      var seleccionado = reg.seleccion === b.nombre;
       var fila = document.createElement("div");
-      fila.className = "bloque-item" + (atrasado ? " atrasado" : "");
+      fila.className = "bloque-item";
       fila.innerHTML =
         '<label class="bloque-check">' +
-          '<input type="checkbox" class="bloque-chk" data-i="' + i + '"' + (b.marcado ? " checked" : "") + '>' +
-          '<span class="bloque-nombre">' + escapeAttr(b.nombre) +
-            (detalle.length ? ('<small>' + escapeAttr(detalle.join(" \u00b7 ")) + '</small>') : '') +
-          '</span>' +
-        '</label>' +
-        '<input type="text" inputmode="numeric" class="bloque-cajas" data-i="' + i + '" placeholder="Cajas" value="' + (b.cajas || 0) + '"' + (b.marcado ? "" : " disabled") + '>';
+          '<input type="checkbox" class="bloque-chk" data-nombre="' + escapeAttr(b.nombre) + '"' + (seleccionado ? " checked" : "") + '>' +
+          '<span class="bloque-nombre">' + escapeAttr(b.nombre) + '</span>' +
+        '</label>';
       cont.appendChild(fila);
     });
 
     cont.querySelectorAll(".bloque-chk").forEach(function(chk){
       chk.addEventListener("change", function(){
-        var i = Number(this.dataset.i);
-        db.ref(rutaSorting("bloques/"+i+"/marcado")).set(this.checked);
-        var fila = this.closest(".bloque-item");
-        var inputCajas = fila ? fila.querySelector(".bloque-cajas") : null;
-        if(inputCajas) inputCajas.disabled = !this.checked;
+        var nombre = this.dataset.nombre;
+        // Al marcar uno, reemplaza automaticamente cualquier seleccion
+        // anterior (es un unico valor en Firebase): nunca puede quedar
+        // mas de un bloque marcado a la vez, ni para este usuario ni
+        // para los demas que esten viendo la pantalla en ese momento.
+        db.ref(rutaSorting("seleccion")).set(this.checked ? nombre : "");
       });
     });
-    cont.querySelectorAll(".bloque-cajas").forEach(function(inp){
-      inp.addEventListener("input", function(){
-        var i = Number(this.dataset.i);
-        var valor = Number(this.value.replace(/[^0-9]/g, "")) || 0;
-        if(valor > 30000){ valor = 30000; }
-        this.value = valor;
-        db.ref(rutaSorting("bloques/"+i+"/cajas")).set(valor);
-      });
-      inp.addEventListener("blur", function(){
-        var i = Number(this.dataset.i);
-        var valor = Number(this.value) || 0;
-        if(valor > 0 && valor < 5000){
-          valor = 5000; this.value = valor;
-          db.ref(rutaSorting("bloques/"+i+"/cajas")).set(valor);
-          toast("El m\u00ednimo permitido es 5,000 cajas.");
-        }
-      });
-    });
-  }
-
-  function actualizarMetaSorting(){
-    var reg = registroSortingActual();
-    if(!reg) return;
-    var total = 0;
-    reg.bloques.forEach(function(b){ if(b.marcado) total += (b.cajas || 0); });
-    var tag = document.getElementById("sorting-meta-tag");
-    if(tag) tag.textContent = total.toLocaleString("es-PE") + " / " + META_SORTING.toLocaleString("es-PE");
-    var barra = document.getElementById("sorting-meta-barra");
-    if(barra){
-      var pct = Math.max(0, Math.min(100, (total / META_SORTING) * 100));
-      barra.style.width = pct + "%";
-      barra.classList.toggle("completa", total >= META_SORTING);
-    }
-    return total;
   }
 
   function bindFuerzaLaboral(){
@@ -1762,39 +1703,29 @@
   function generarMensajeSorting(){
     var reg = registroSortingActual();
     if(!reg) return "";
-    var ahora = new Date();
-    var hhmmss = String(ahora.getHours()).padStart(2,"0") + ":" + String(ahora.getMinutes()).padStart(2,"0") + ":" + String(ahora.getSeconds()).padStart(2,"0");
+    var fechaLive = fechaLiveStr();
+    var horaLive = horaLiveStr();
     var totalPersonal = (reg.personalFijo||0) + (reg.personalRefuerzo||0);
-    var totalCajas = 0;
     var lineas = [];
     lineas.push("*REPORTE DE BLOQUES - SORTING*");
     lineas.push("Turno: " + nombreCortoTurno(estado.turno));
     lineas.push("Encargado: " + (estado.nombreSorting || "-"));
-    lineas.push("Fecha: " + (estado.fecha || "-"));
-    lineas.push("Hora de Env\u00edo: " + hhmmss);
+    lineas.push("Fecha: " + fechaLive);
+    lineas.push("Hora de Env\u00edo: " + horaLive);
     lineas.push("");
     lineas.push("*BLOQUES ENTREGADOS:*");
-    reg.bloques.forEach(function(b){
-      if(b.marcado) totalCajas += (b.cajas || 0);
-      var check = b.marcado ? "\u2611" : "\u2610";
-      var partes = [check + " " + b.nombre];
-      if(b.entregaVacia) partes.push("[ ]");
-      else if(b.entrega) partes.push(b.entrega);
-      partes.push((b.cajas || 0) + " Cajas");
-      if(b.nota) partes.push(b.nota);
-      var linea = partes.join(" - ");
-      if(bloqueEstaAtrasado(b)) linea += " [\u26A0 ATRASADO]";
-      lineas.push(linea);
-    });
+    if(reg.seleccion){
+      lineas.push(reg.seleccion + " - " + horaLive);
+    } else {
+      lineas.push("(Sin bloque seleccionado)");
+    }
     lineas.push("");
-    lineas.push("*TOTAL DEL TURNO:* " + totalCajas + " / " + META_SORTING + " Cajas");
     lineas.push("*FUERZA LABORAL:*");
     lineas.push("- Personal Fijo: " + (reg.personalFijo||0) + " personas");
     lineas.push("- Personal Refuerzo: " + (reg.personalRefuerzo||0) + " personas");
     lineas.push("- Total Personal en Turno: " + totalPersonal + " personas");
-    lineas.push("- Apoyo con Validaci\u00f3n: " + (reg.apoyoValidacion ? "SI" : "NO"));
     lineas.push("");
-    lineas.push("Por favor confirmar recepci\u00f3n.");
+    lineas.push("Se solicita apoyo con la validaci\u00f3n.");
     return lineas.join("\n");
   }
   function actualizarMensajeSorting(){
@@ -1810,44 +1741,13 @@
     enviarPorWhatsapp(generarMensajeSorting());
   });
 
-  /* ============== SORTING: ALARMA DE BLOQUES ATRASADOS ============== */
-  var alarmaSortingActiva = false;
-  var alarmaSortingSonidoId = null;
-  var monitorAlarmaSortingId = null;
-
-  function dispararAlarmaSorting(){
-    if(alarmaSortingActiva) return;
-    alarmaSortingActiva = true;
-    if(alarmaSortingSonidoId) clearInterval(alarmaSortingSonidoId);
-    reproducirBeep();
-    alarmaSortingSonidoId = setInterval(reproducirBeep, 1500);
-    toast("\u26A0 Hay bloques atrasados sin marcar.");
-  }
-  function detenerAlarmaSorting(){
-    alarmaSortingActiva = false;
-    if(alarmaSortingSonidoId){ clearInterval(alarmaSortingSonidoId); alarmaSortingSonidoId = null; }
-  }
-  function verificarAlarmaSorting(){
-    if(rolActual !== "sorting" || !estado || !estado.turno){ detenerAlarmaSorting(); return; }
-    var reg = registroSortingActual();
-    if(!reg){ detenerAlarmaSorting(); return; }
-    var hayAtraso = reg.bloques.some(function(b){ return bloqueEstaAtrasado(b); });
-    if(hayAtraso) dispararAlarmaSorting(); else detenerAlarmaSorting();
-  }
-  function iniciarMonitorAlarmaSorting(){
-    if(monitorAlarmaSortingId) clearInterval(monitorAlarmaSortingId);
-    monitorAlarmaSortingId = setInterval(verificarAlarmaSorting, 20000);
-  }
-
   function renderSorting(){
     var reg = registroSortingActual();
     if(!reg) return;
     actualizarRelojSorting();
     renderBloques();
     bindFuerzaLaboral();
-    actualizarMetaSorting();
     actualizarMensajeSorting();
-    verificarAlarmaSorting();
   }
 
   /* ============== COLAPSABLES ============== */
@@ -1880,7 +1780,6 @@
     suscribirComun();
     suscribirHistorico();
     iniciarMonitorAlarma();
-    iniciarMonitorAlarmaSorting();
     actualizarRelojSorting();
     setInterval(actualizarRelojSorting, 1000);
 
