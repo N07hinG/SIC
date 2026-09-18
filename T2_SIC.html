@@ -303,6 +303,19 @@
   body.rol-backus .solo-lavoro, body.rol-backus .solo-sorting{display:none !important;}
   body.rol-sorting .solo-backus, body.rol-sorting .solo-lavoro{display:none !important;}
   body.rol-sorting .oculto-sorting{display:none !important;}
+  body:not(.es-fila-backus) .solo-fila-backus{display:none !important;}
+  body.es-fila-backus .solo-sup-backus{display:none !important;}
+  body.backus-noche .panel-editor-horas-clasico{display:none !important;}
+  .msg-panel{display:none;}
+  .msg-panel.open{display:block;}
+  .obs-row{margin-bottom:8px;}
+  .obs-select{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
+    padding:9px 10px;font-size:13px;outline:none;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d99a3' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:32px;
+  }
+  .obs-select:focus{border-color:var(--amber);}
 </style>
 </head>
 <body>
@@ -361,6 +374,17 @@
             <option value="Turno 3 - Nocturno">Noche</option>
           </select>
         </div>
+        <div class="campo" id="campo-fila-login" style="display:none;">
+          <label for="in-fila-login">Selecciona tu Fila</label>
+          <select id="in-fila-login">
+            <option value="" selected disabled>Selecciona una opci&oacute;n</option>
+            <option value="f1">Fila 1</option>
+            <option value="f2">Fila 2</option>
+            <option value="f3">Fila 3</option>
+            <option value="f4">Fila 4</option>
+            <option value="sup">Supervisor Backus</option>
+          </select>
+        </div>
         <div class="campo">
           <label for="in-nombre-login">Ingresa tus Nombres Completos</label>
           <input id="in-nombre-login" type="text" placeholder="Nombre y Apellido" autocomplete="off">
@@ -383,18 +407,19 @@
     <div class="brand"><span class="t2" style="color:var(--amber)">SIC</span> DIGITAL</div>
     <div class="topbar-actions">
       <span class="sync-badge"><span class="sync-dot" id="sync-dot-app"></span><span id="sync-txt-app">conectando&hellip;</span></span>
-      <button class="icon-btn solo-backus" id="btn-reset" title="Reiniciar el turno actual (nuevo reporte)">&#8635;</button>
+      <button class="icon-btn solo-backus solo-sup-backus" id="btn-reset" title="Reiniciar el turno actual (nuevo reporte)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
     </div>
   </div>
 
   <main>
 
-    <section class="panel solo-backus">
+    <section class="panel solo-backus solo-sup-backus">
       <div class="marca-row">
         <span class="marca-ab">AB InBev</span>
         <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
       </div>
+      <div class="sorting-reloj" id="backus-reloj" style="margin-bottom:12px;">--/--/---- &middot; --:--:--</div>
       <div class="grid2">
         <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
         <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
@@ -419,6 +444,44 @@
         <div class="btn-row">
           <button class="btn btn-ghost" id="btn-copiar-msg">Copiar</button>
           <button class="btn btn-amber" id="btn-whatsapp-msg">Enviar por WhatsApp</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fila (solo Turno Noche + rol Fila 1-4) -->
+    <section class="panel solo-backus solo-fila-backus">
+      <div class="marca-row">
+        <span class="marca-ab">AB InBev</span>
+        <span class="marca-sic">SIC <span class="accent">Digital</span> VPO</span>
+      </div>
+      <div class="info-lavoro">
+        <div class="caja"><label>FILA</label><span id="fb-fila-nombre">-</span></div>
+        <div class="caja"><label>TURNO</label><span id="fb-turno">-</span></div>
+      </div>
+      <div class="sorting-reloj" id="fila-backus-reloj" style="margin-bottom:12px;">--/--/---- &middot; --:--:--</div>
+      <div class="plan-accion-display" id="fb-plan-accion" title="Toca para silenciar la alarma">-</div>
+    </section>
+
+    <section class="panel solo-backus solo-fila-backus">
+      <div class="panel-title small">Registrar Cargados</div>
+      <div class="horas-grid" id="fb-horas-grid"></div>
+      <div class="campo-dato">
+        <label>Transportes Cargados (esta hora)</label>
+        <input id="fb-cargado" inputmode="numeric" value="0">
+      </div>
+      <button class="btn btn-amber" id="fb-btn-actualizar" style="margin-top:6px;">Actualizar</button>
+    </section>
+
+    <section class="panel solo-backus solo-fila-backus">
+      <div class="caja-estatus" id="fb-btn-estatus" style="width:100%;">
+        <span class="led"></span>
+        <span>ESTATUS DE CARGA</span>
+      </div>
+      <div id="fb-panel-mensaje" class="msg-panel" style="margin-top:12px;">
+        <div class="mensaje-caja" id="fb-mensaje-texto"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="fb-btn-copiar-msg">Copiar</button>
+          <button class="btn btn-amber" id="fb-btn-whatsapp-msg">Enviar por WhatsApp</button>
         </div>
       </div>
     </section>
@@ -480,7 +543,7 @@
         </div>
       </div>
     </section>
-    <section class="panel solo-backus">
+    <section class="panel solo-backus solo-sup-backus">
       <div class="panel-title" id="titulo-grafico">Unidades cargadas x horas planificadas<span class="tag" id="tag-total">0/0</span></div>
       <div class="chart-wrap"><canvas id="grafico"></canvas></div>
       <div class="estado-fila">
@@ -490,7 +553,13 @@
       </div>
     </section>
 
-    <section class="panel oculto-sorting">
+    <!-- Detalle por fila (solo Supervisor Backus, solo se ve/llena en Turno Noche) -->
+    <section class="panel solo-backus solo-sup-backus" id="panel-detalle-filas" style="display:none;">
+      <div class="panel-title small">Detalle por Fila (Turno Noche)</div>
+      <div id="detalle-filas-lista"></div>
+    </section>
+
+    <section class="panel oculto-sorting panel-editor-horas-clasico">
       <div class="panel-title">
         <span class="solo-backus">Editar datos</span>
         <span class="solo-lavoro">Registrar Armados</span>
@@ -509,12 +578,22 @@
       <button class="btn btn-amber" id="btn-actualizar" style="margin-top:6px;">Actualizar</button>
     </section>
 
-    <section class="panel compact solo-backus">
+    <!-- Observacion (solo Fila 1-4) -->
+    <section class="panel solo-backus solo-fila-backus">
+      <div class="panel-title small">Observaci&oacute;n</div>
+      <div id="fb-obs-lista"></div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn" id="fb-obs-menos" type="button">&minus;</button>
+        <button class="btn" id="fb-obs-mas" type="button">+</button>
+      </div>
+    </section>
+
+    <section class="panel compact solo-backus solo-sup-backus">
       <div class="panel-title small">Planes de reacci&oacute;n</div>
       <div id="planes-lista"></div>
     </section>
 
-    <section class="panel solo-backus">
+    <section class="panel solo-backus solo-sup-backus">
       <div class="collapsible-head" data-target="hist-body">
         <div class="panel-title" style="margin:0;">Hist&oacute;rico<span class="chev" id="chev-hist">&#9662;</span></div>
       </div>
@@ -591,11 +670,59 @@
     { nombre:"FILA 4" }
   ];
 
+  // ABInBev / Turno Noche: sistema de filas.
+  var FILAS_IDS = ["f1","f2","f3","f4"];
+  var FILAS_NOMBRES = { f1:"Fila 1", f2:"Fila 2", f3:"Fila 3", f4:"Fila 4", sup:"Supervisor Backus" };
+  function nombreFila(filaId){ return FILAS_NOMBRES[filaId] || filaId; }
+  // Horas habilitadas para editar Cargados en Turno Noche: se activa la
+  // 1am y se bloquea por completo la 2am (ya no aparece ni se pide).
+  // Offsets = horas desde el inicio del turno (23:00).
+  var OFFSETS_FILA_NOCHE = [1, 2, 4, 5, 6, 7, 8]; // 12am,1am,3am,4am,5am,6am,7am (se salta el +3 = 2am)
+
+  var OBS_OPCIONES = [
+    "Exceso de Camiones con Envases",
+    "Encimado Marketplace",
+    "Error de Armado Lavoro",
+    "Error de asignaci\u00f3n de Parihuelas Mixs",
+    "Modificaci\u00f3n de carga",
+    "Error de Carga",
+    "Sobre carga Marketplace",
+    "Producto Bloqueado x calidad",
+    "Barriles en el s\u00f3tano",
+    "Producto Terminado sin desencimar",
+    "Generaci\u00f3n de Orden Interna x Producto sin stock/Frescura"
+  ];
+
   function horaLabel(h24){
     var h = ((h24 % 24) + 24) % 24;
     var periodo = h < 12 ? "am" : "pm";
     var h12 = h % 12; if(h12 === 0) h12 = 12;
     return h12 + ":00 " + periodo;
+  }
+  function generarHorasFilaNoche(){
+    return OFFSETS_FILA_NOCHE.map(function(off){
+      return { hora: horaLabel(TURNO_INICIO["Turno 3 - Nocturno"] + off), cargado:0 };
+    });
+  }
+  function normalizarHorasFila(horas){
+    if(Array.isArray(horas) && horas.length === OFFSETS_FILA_NOCHE.length) return horas;
+    var base = generarHorasFilaNoche();
+    if(horas && typeof horas === "object"){
+      Object.keys(horas).forEach(function(k){
+        var i = Number(k);
+        if(!isNaN(i) && base[i]) base[i] = Object.assign({}, base[i], horas[k]);
+      });
+    }
+    return base;
+  }
+  function normalizarObservaciones(obs){
+    if(Array.isArray(obs) && obs.length) return obs;
+    if(obs && typeof obs === "object"){
+      var arr = [];
+      Object.keys(obs).sort().forEach(function(k){ arr.push(obs[k] || ""); });
+      if(arr.length) return arr;
+    }
+    return ["", "", ""];
   }
   function generarHorasPorTurno(turno){
     var inicio = (turno && TURNO_INICIO.hasOwnProperty(turno)) ? TURNO_INICIO[turno] : TURNO_INICIO["Turno 3 - Nocturno"];
@@ -685,11 +812,13 @@
   /* ============== ESTADO LOCAL (solo sesion) + CACHE (espejo de Firebase) ============== */
   var estado = {
     turno: "", nombreBackus:"", nombreLavoro:"", nombreSorting:"",
+    filaBackus: "", // "f1".."f4" o "sup" (solo aplica a rol backus en Turno Noche)
     subarea:"T2", fecha: fechaHoyStr(), area:"LOG",
     monitoreo:"Unidades cargadas x horas planificadas",
     planes: planesPorDefecto()
   };
-  var horaSelIdx = 0;
+  var horaSelIdx = 0;      // hora seleccionada en el editor clasico (Lavoro / Backus Dia-Tarde)
+  var horaSelIdxFila = 0;  // hora seleccionada en el editor de Fila (Backus Turno Noche)
   var rolActual = null;
   var filtroInicioActual = "todos";
   var alarmaActiva = false;
@@ -701,6 +830,30 @@
   var refComun = null, refRegistrosFecha = null, refSortingFecha = null, refHistorico = null;
   var fechaSuscrita = null;
   var fechaSortingSuscrita = null; // Sorting usa el reloj en vivo, no la fecha de ABInBev/Externo
+
+  // Recordar la sesion (turno/nombre/fila) de ESTE dispositivo entre recargas
+  // de pagina. No es dato compartido: vive solo en sessionStorage, como el rol.
+  var SESSION_INFO_KEY = "t2sic_session_info";
+  function guardarInfoSesion(){
+    try{
+      guardarSesion(SESSION_INFO_KEY, JSON.stringify({
+        turno: estado.turno, nombreBackus: estado.nombreBackus, nombreLavoro: estado.nombreLavoro,
+        nombreSorting: estado.nombreSorting, filaBackus: estado.filaBackus
+      }));
+    }catch(e){}
+  }
+  function restaurarInfoSesion(){
+    try{
+      var raw = leerSesion(SESSION_INFO_KEY);
+      if(!raw) return;
+      var obj = JSON.parse(raw);
+      estado.turno = obj.turno || estado.turno;
+      estado.nombreBackus = obj.nombreBackus || estado.nombreBackus;
+      estado.nombreLavoro = obj.nombreLavoro || estado.nombreLavoro;
+      estado.nombreSorting = obj.nombreSorting || estado.nombreSorting;
+      estado.filaBackus = obj.filaBackus || "";
+    }catch(e){}
+  }
 
   /* ============== ESTADO DE CONEXION ============== */
   firebase.database().ref(".info/connected").on("value", function(snap){
@@ -834,17 +987,18 @@
     if(!estado.turno) return null;
     var turnoId = TURNO_ID[estado.turno];
     var r = cacheRegistros[turnoId];
-    if(!r) return { horas: generarHorasPorTurno(estado.turno), transportesProgramados: 74 };
+    if(!r) return { horas: generarHorasPorTurno(estado.turno), transportesProgramados: 74, filas:{} };
     return {
       horas: normalizarHoras(r.horas, estado.turno),
-      transportesProgramados: (r.transportesProgramados !== undefined ? r.transportesProgramados : 74)
+      transportesProgramados: (r.transportesProgramados !== undefined ? r.transportesProgramados : 74),
+      filas: r.filas || {}
     };
   }
   function obtenerRegistroPorTurno(turnoNombre){
     var turnoId = TURNO_ID[turnoNombre];
     var r = cacheRegistros[turnoId];
-    if(!r) return { horas: generarHorasPorTurno(turnoNombre), transportesProgramados: 0 };
-    return { horas: normalizarHoras(r.horas, turnoNombre), transportesProgramados: (r.transportesProgramados||0) };
+    if(!r) return { horas: generarHorasPorTurno(turnoNombre), transportesProgramados: 0, filas:{} };
+    return { horas: normalizarHoras(r.horas, turnoNombre), transportesProgramados: (r.transportesProgramados||0), filas: r.filas || {} };
   }
   function registroSortingActual(){
     if(!estado.turno) return null;
@@ -859,10 +1013,73 @@
     };
   }
 
-  function calcularAcumuladoRegistro(reg){
+  /* ============== ABInBev / TURNO NOCHE: LECTURA Y AGREGACION POR FILA ==============
+     El Cargado de Turno Noche ya no vive en registro.horas (eso sigue siendo
+     solo el Armado, que edita Externo/Lavoro sin cambios): vive en
+     registro.filas.{f1..f4}.horas, cada fila con su propio arreglo
+     independiente. Nunca se cruza informacion entre filas. */
+  function registroFilaActual(filaId, reg){
+    var r = reg || registroActual();
+    var f = r && r.filas && r.filas[filaId];
+    return {
+      horas: normalizarHorasFila(f && f.horas),
+      observaciones: normalizarObservaciones(f && f.observaciones),
+      nombre: (f && f.nombre) || ""
+    };
+  }
+  function totalCargadoFila(filaId, reg){
+    var freg = registroFilaActual(filaId, reg);
+    var total = 0;
+    freg.horas.forEach(function(h){ total += (h.cargado||0); });
+    return total;
+  }
+  // Suma, hora a hora (por posicion de slot), el Cargado de las 4 filas.
+  // Devuelve un arreglo de 7 horas listo para usarse como si fuera el
+  // "horas" clasico (con acumArmado/acumCargado/pct calculados aparte).
+  function horasAgregadasNoche(reg){
+    var base = generarHorasFilaNoche();
+    FILAS_IDS.forEach(function(fid){
+      var freg = registroFilaActual(fid, reg);
+      freg.horas.forEach(function(h, i){ if(base[i]) base[i].cargado += (h.cargado||0); });
+    });
+    return base;
+  }
+  function totalCargadoNoche(reg){
+    var total = 0;
+    horasAgregadasNoche(reg).forEach(function(h){ total += (h.cargado||0); });
+    return total;
+  }
+  // Bundle listo para graficar/reportar: elige la fuente correcta segun el
+  // turno (horas clasicas para Dia/Tarde, agregado de filas para Noche) y
+  // calcula acumulados/porcentajes sobre esa copia (no toca registro.horas
+  // real, asi que nunca interfiere con lo que usa Externo/Lavoro).
+  function obtenerHorasCalculadas(){
+    var reg = registroActual();
+    if(!reg) return null;
+    var esNoche = estado.turno === "Turno 3 - Nocturno";
+    var horas = esNoche ? horasAgregadasNoche(reg) : reg.horas;
+    var meta = reg.transportesProgramados || 0;
+    var sumaArmado = 0, sumaCargado = 0;
+    horas.forEach(function(h){
+      sumaArmado += (h.armado||0);
+      sumaCargado += (h.cargado||0);
+      h.acumArmado = sumaArmado;
+      h.acumCargado = sumaCargado;
+      h.pct = meta > 0 ? sumaCargado / meta : 0;
+      h.pctArmado = meta > 0 ? sumaArmado / meta : 0;
+    });
+    return { reg: reg, horas: horas, meta: meta, esNoche: esNoche };
+  }
+
+  function calcularAcumuladoRegistro(reg, turnoNombre){
     var meta = (reg && reg.transportesProgramados) || 0;
     var sumaArmado = 0, sumaCargado = 0;
-    ((reg && reg.horas) || []).forEach(function(h){ sumaArmado += (h.armado||0); sumaCargado += (h.cargado||0); });
+    ((reg && reg.horas) || []).forEach(function(h){ sumaArmado += (h.armado||0); });
+    if(turnoNombre === "Turno 3 - Nocturno"){
+      sumaCargado = totalCargadoNoche(reg);
+    } else {
+      ((reg && reg.horas) || []).forEach(function(h){ sumaCargado += (h.cargado||0); });
+    }
     return { armado: sumaArmado, cargado: sumaCargado, meta: meta };
   }
 
@@ -901,6 +1118,15 @@
     if(!elUserMenu.contains(e.target) && e.target !== elBtnUserMenu){ cerrarMenuUsuario(); }
   });
 
+  function actualizarVisibilidadCampoFila(){
+    var campoFila = document.getElementById("campo-fila-login");
+    var turnoVal = document.getElementById("in-turno-login").value;
+    var mostrar = rolSeleccionado === "backus" && turnoVal === "Turno 3 - Nocturno";
+    campoFila.style.display = mostrar ? "block" : "none";
+    if(!mostrar) document.getElementById("in-fila-login").value = "";
+  }
+  document.getElementById("in-turno-login").addEventListener("change", actualizarVisibilidadCampoFila);
+
   function abrirFormularioLogin(rol){
     rolSeleccionado = rol;
     cerrarMenuUsuario();
@@ -908,6 +1134,7 @@
     document.getElementById("in-turno-login").value = "";
     document.getElementById("in-nombre-login").value = "";
     document.getElementById("in-pass-login").value = "";
+    document.getElementById("in-fila-login").value = "";
     if(rol === "backus"){
       elFormLoginTitulo.textContent = "Ingresar \u00b7 ABInBev";
       elCampoPass.style.display = "block";
@@ -918,6 +1145,7 @@
       elFormLoginTitulo.textContent = "Ingresar \u00b7 Externo";
       elCampoPass.style.display = "none";
     }
+    actualizarVisibilidadCampoFila();
     elFormLogin.classList.add("open");
   }
   document.getElementById("opt-abinbev").addEventListener("click", function(){ abrirFormularioLogin("backus"); });
@@ -936,11 +1164,20 @@
         var pass = document.getElementById("in-pass-login").value;
         if(pass !== CLAVE_ABINBEV){ err.textContent = "Contrase\u00f1a incorrecta."; return; }
       }
+      var filaElegida = "sup";
+      if(rolSeleccionado === "backus" && turno === "Turno 3 - Nocturno"){
+        filaElegida = document.getElementById("in-fila-login").value;
+        if(!filaElegida){ err.textContent = "Selecciona tu fila (o Supervisor Backus)."; return; }
+      }
       err.textContent = "";
       estado.turno = turno;
       if(rolSeleccionado === "backus"){
         estado.nombreBackus = nombre;
+        estado.filaBackus = filaElegida;
         asegurarRegistroExiste(turno, estado.fecha);
+        if(FILAS_IDS.indexOf(filaElegida) >= 0){
+          db.ref(rutaRegistro("filas/"+filaElegida+"/nombre")).set(nombre);
+        }
       } else if(rolSeleccionado === "sorting"){
         estado.nombreSorting = nombre;
         asegurarRegistroSortingExiste(turno);
@@ -949,17 +1186,35 @@
         asegurarRegistroExiste(turno, estado.fecha);
       }
       horaSelIdx = 0;
+      horaSelIdxFila = 0;
       guardarSesion(SESSION_KEY, rolSeleccionado);
+      guardarInfoSesion();
       mostrarApp(rolSeleccionado);
     }catch(e){
       err.textContent = "No se pudo ingresar. Intenta recargar la p\u00e1gina.";
     }
   });
 
+  // Marca en el body si esta sesion de ABInBev es una Fila (1-4) o el
+  // Supervisor, solo cuando el turno es Noche. Estas clases controlan
+  // que panel ve cada quien (ver reglas CSS .solo-fila-backus /
+  // .solo-sup-backus / .panel-editor-horas-clasico).
+  function aplicarClasesSubrolBackus(){
+    document.body.classList.remove("es-fila-backus", "backus-noche");
+    if(rolActual !== "backus") return;
+    if(estado.turno === "Turno 3 - Nocturno"){
+      document.body.classList.add("backus-noche");
+      if(FILAS_IDS.indexOf(estado.filaBackus) >= 0){
+        document.body.classList.add("es-fila-backus");
+      }
+    }
+  }
+
   function mostrarApp(rol){
     rolActual = rol;
     document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
     document.body.classList.add("rol-" + rol);
+    aplicarClasesSubrolBackus();
     document.getElementById("vista-login").style.display = "none";
     document.getElementById("vista-app").style.display = "block";
     render();
@@ -967,14 +1222,16 @@
 
   function cerrarSesion(){
     borrarSesion(SESSION_KEY);
+    borrarSesion(SESSION_INFO_KEY);
     rolActual = null;
     rolSeleccionado = null;
-    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting");
+    document.body.classList.remove("rol-backus", "rol-lavoro", "rol-sorting", "es-fila-backus", "backus-noche");
     document.getElementById("vista-app").style.display = "none";
     document.getElementById("vista-login").style.display = "flex";
     document.getElementById("in-turno-login").value = "";
     document.getElementById("in-nombre-login").value = "";
     document.getElementById("in-pass-login").value = "";
+    document.getElementById("in-fila-login").value = "";
     document.getElementById("login-error-generico").textContent = "";
     elFormLogin.classList.remove("open");
     cerrarMenuUsuario();
@@ -992,8 +1249,14 @@
       "\u00bfSeguro que quieres continuar?"
     );
     if(!ok) return;
-    db.ref(rutaRegistro("")).set({ transportesProgramados:74, horas: generarHorasPorTurno(estado.turno) });
+    var nuevoRegistro = { transportesProgramados:74, horas: generarHorasPorTurno(estado.turno) };
+    if(estado.turno === "Turno 3 - Nocturno"){
+      nuevoRegistro.filas = {};
+      FILAS_IDS.forEach(function(fid){ nuevoRegistro.filas[fid] = { horas: generarHorasFilaNoche(), observaciones: ["","",""], nombre:"" }; });
+    }
+    db.ref(rutaRegistro("")).set(nuevoRegistro);
     horaSelIdx = 0;
+    horaSelIdxFila = 0;
     silenciarAlarma(true);
     toast("Reporte del turno reiniciado. Los dem\u00e1s turnos no se modificaron.");
   });
@@ -1035,20 +1298,33 @@
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   function generarMensaje(){
-    calcularPorcentajes();
-    var reg = registroActual();
-    var h = (reg && reg.horas[horaSelIdx]) || {};
-    var meta = reg ? reg.transportesProgramados : 0;
+    var bundle = obtenerHorasCalculadas();
+    if(!bundle) return "";
+    var horas = bundle.horas, meta = bundle.meta;
+    var idx = bundle.esNoche ? (horas.length-1) : horaSelIdx;
+    var h = horas[idx] || {};
     var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
-    return "STATUS DE CARGA\n" +
+    var msg = "STATUS DE CARGA\n" +
       "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
       "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
       "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + (estado.fecha || "-") + "\n" +
-      "Hora: " + (h.hora || "-") + "\n" +
+      "Fecha: " + fechaLiveStr() + "\n" +
+      "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
+      (bundle.esNoche ? "" : ("Hora: " + (h.hora||"-") + "\n")) +
       "Armados (acum.): " + (h.acumArmado||0) + "\n" +
       "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
       "Cumplimiento: " + pct + "%";
+    if(bundle.esNoche){
+      msg += "\n\nDETALLE POR FILA:";
+      FILAS_IDS.forEach(function(fid){
+        var freg = registroFilaActual(fid, bundle.reg);
+        var totalFila = 0;
+        freg.horas.forEach(function(hh){ totalFila += (hh.cargado||0); });
+        var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
+        msg += "\n" + nombreFila(fid) + ": " + totalFila + " cargados" + (obs ? " - " + obs : "");
+      });
+    }
+    return msg;
   }
   function actualizarMensaje(){ document.getElementById("mensaje-texto").textContent = generarMensaje(); }
   document.getElementById("btn-estatus").addEventListener("click", function(){
@@ -1133,16 +1409,8 @@
     fijarSiNoEnfocado(document.getElementById("d-armado"), h.armado || 0);
     var elCargado = document.getElementById("d-cargado");
     fijarSiNoEnfocado(elCargado, h.cargado || 0);
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
-      elCargado.disabled = true;
-      elCargado.title = "No se permite registrar Cargados a la 1:00 am (Turno Noche).";
-    } else {
-      elCargado.disabled = false;
-      elCargado.removeAttribute("title");
-    }
-  }
-  function cargadoBloqueadoEnHora(turno, horaTxt){
-    return turno === "Turno 3 - Nocturno" && horaTxt === "1:00 am";
+    elCargado.disabled = false;
+    elCargado.removeAttribute("title");
   }
   function maxCargadoPermitidoEnHora(reg, idx){
     var cumArmadoHastaHora = 0;
@@ -1177,11 +1445,6 @@
     var reg = cacheRegistros[turnoId];
     reg.horas = normalizarHoras(reg.horas, estado.turno);
     var h = reg.horas[horaSelIdx];
-    if(cargadoBloqueadoEnHora(estado.turno, h.hora)){
-      this.value = h.cargado || 0;
-      toast("No se permite registrar Cargados a la 1:00 am (Turno Noche).");
-      return;
-    }
     var valor = Number(this.value)||0;
     var maxPermitido = maxCargadoPermitidoEnHora(reg, horaSelIdx);
     if(valor > maxPermitido){
@@ -1192,6 +1455,177 @@
     db.ref(rutaRegistro("horas/"+horaSelIdx+"/cargado")).set(valor);
     dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
   });
+
+  /* ============== ABInBev / TURNO NOCHE: FILAS (1-4) ==============
+     Cada fila tiene su propio grid de horas (7, sin la 2am), su propio
+     input de Cargado y su propio mensaje de WhatsApp. Nunca leen ni
+     escriben el registro de otra fila salvo el Supervisor (solo lectura,
+     para el detalle y el mensaje agregado). */
+  function actualizarRelojGenerico(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = fechaLiveStr() + " \u00b7 " + horaLiveStr();
+  }
+
+  function renderHorasGridFila(){
+    var cont = document.getElementById("fb-horas-grid");
+    if(!cont) return;
+    var freg = registroFilaActual(estado.filaBackus);
+    cont.innerHTML = "";
+    freg.horas.forEach(function(h, i){
+      var tieneDatos = h.cargado ? true : false;
+      var btn = document.createElement("div");
+      btn.className = "hora-btn" + (i === horaSelIdxFila ? " activa" : "");
+      btn.innerHTML = escapeAttr(h.hora) + (tieneDatos ? '<span class="chk">&#10003;</span>' : '');
+      btn.addEventListener("click", function(){
+        horaSelIdxFila = i;
+        renderHorasGridFila(); bindDatosHoraFila(); actualizarMensajeFila();
+      });
+      cont.appendChild(btn);
+    });
+  }
+  function bindDatosHoraFila(){
+    var freg = registroFilaActual(estado.filaBackus);
+    var h = freg.horas[horaSelIdxFila];
+    fijarSiNoEnfocado(document.getElementById("fb-cargado"), (h && h.cargado) || 0);
+  }
+  document.getElementById("fb-cargado").addEventListener("input", function(){
+    var filaId = estado.filaBackus;
+    var turnoId = TURNO_ID[estado.turno];
+    if(!cacheRegistros[turnoId]) cacheRegistros[turnoId] = { transportesProgramados:74, horas: generarHorasPorTurno(estado.turno), filas:{} };
+    if(!cacheRegistros[turnoId].filas) cacheRegistros[turnoId].filas = {};
+    if(!cacheRegistros[turnoId].filas[filaId]) cacheRegistros[turnoId].filas[filaId] = { horas: generarHorasFilaNoche(), observaciones:["","",""] };
+    var freg = cacheRegistros[turnoId].filas[filaId];
+    freg.horas = normalizarHorasFila(freg.horas);
+    var valor = Number(this.value) || 0;
+    freg.horas[horaSelIdxFila] = freg.horas[horaSelIdxFila] || { hora:"" };
+    freg.horas[horaSelIdxFila].cargado = valor;
+    db.ref(rutaRegistro("filas/"+filaId+"/horas/"+horaSelIdxFila+"/cargado")).set(valor);
+    actualizarMensajeFila();
+  });
+  document.getElementById("fb-btn-actualizar").addEventListener("click", function(){
+    guardarEnHistorico();
+    renderHorasGridFila();
+    actualizarMensajeFila();
+    verificarAlarma();
+    verificarAlarmaFilasNoche();
+    toast("Datos actualizados");
+  });
+
+  function generarMensajeFila(){
+    var filaId = estado.filaBackus;
+    var freg = registroFilaActual(filaId);
+    var total = 0; freg.horas.forEach(function(h){ total += (h.cargado||0); });
+    var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
+    return "STATUS DE CARGA - " + nombreFila(filaId) + "\n" +
+      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
+      "Encargado: " + (estado.nombreBackus || "-") + "\n" +
+      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
+      "Fecha: " + fechaLiveStr() + "\n" +
+      "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
+      "Cargados (acum. de la fila): " + total + "\n" +
+      "OBSERVACION: " + (obs || "Ninguna");
+  }
+  function actualizarMensajeFila(){
+    var el = document.getElementById("fb-mensaje-texto");
+    if(el) el.textContent = generarMensajeFila();
+  }
+  document.getElementById("fb-btn-estatus").addEventListener("click", function(){
+    var panel = document.getElementById("fb-panel-mensaje");
+    actualizarMensajeFila(); panel.classList.toggle("open");
+  });
+  document.getElementById("fb-btn-copiar-msg").addEventListener("click", function(){ copiarTexto(generarMensajeFila()); });
+  document.getElementById("fb-btn-whatsapp-msg").addEventListener("click", function(){ enviarPorWhatsapp(generarMensajeFila()); });
+
+  function actualizarUIPlanAccionFila(){
+    var caja = document.getElementById("fb-plan-accion");
+    if(!caja) return;
+    if(alarmaActiva){
+      caja.textContent = "\u26A0 ALERTA: activar Plan de Acci\u00f3n";
+      caja.classList.add("alerta");
+    } else if(estado.turno && TURNO_CORTE[estado.turno]){
+      var corte = TURNO_CORTE[estado.turno];
+      caja.textContent = "OK \u00b7 corte " + String(corte.h).padStart(2,"0") + ":" + String(corte.m).padStart(2,"0");
+      caja.classList.remove("alerta");
+    } else { caja.textContent = "-"; caja.classList.remove("alerta"); }
+  }
+
+  /* ============== ABInBev / TURNO NOCHE: OBSERVACIONES (solo Filas) ============== */
+  function renderObservacionesFila(){
+    var cont = document.getElementById("fb-obs-lista");
+    if(!cont) return;
+    var enfocado = document.activeElement;
+    if(enfocado && enfocado.classList && enfocado.classList.contains("obs-select")) return; // no interrumpir mientras elige
+    var freg = registroFilaActual(estado.filaBackus);
+    cont.innerHTML = "";
+    freg.observaciones.forEach(function(valor, i){
+      var row = document.createElement("div");
+      row.className = "obs-row";
+      var opts = '<option value=""></option>' + OBS_OPCIONES.map(function(o){
+        return '<option value="'+escapeAttr(o)+'"'+(o===valor?" selected":"")+'>'+escapeAttr(o)+'</option>';
+      }).join("");
+      row.innerHTML = '<select class="obs-select" data-i="'+i+'">'+opts+'</select>';
+      cont.appendChild(row);
+    });
+    cont.querySelectorAll(".obs-select").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        var i = Number(this.dataset.i);
+        db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones/"+i)).set(this.value);
+        actualizarMensajeFila();
+      });
+    });
+  }
+  document.getElementById("fb-obs-mas").addEventListener("click", function(){
+    var freg = registroFilaActual(estado.filaBackus);
+    var nuevas = freg.observaciones.concat([""]);
+    db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones")).set(nuevas);
+  });
+  document.getElementById("fb-obs-menos").addEventListener("click", function(){
+    var freg = registroFilaActual(estado.filaBackus);
+    if(freg.observaciones.length <= 1){ toast("Debe quedar al menos 1 espacio de observaci\u00f3n."); return; }
+    var nuevas = freg.observaciones.slice(0, -1);
+    db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones")).set(nuevas);
+  });
+
+  function renderFilaBackus(){
+    var elNombre = document.getElementById("fb-fila-nombre");
+    if(elNombre) elNombre.textContent = nombreFila(estado.filaBackus);
+    var elTurno = document.getElementById("fb-turno");
+    if(elTurno) elTurno.textContent = nombreCortoTurno(estado.turno);
+    actualizarRelojGenerico("fila-backus-reloj");
+    renderHorasGridFila();
+    bindDatosHoraFila();
+    renderObservacionesFila();
+    actualizarMensajeFila();
+    actualizarUIPlanAccionFila();
+    verificarAlarma();
+    verificarAlarmaFilasNoche();
+  }
+
+  /* ============== ABInBev / TURNO NOCHE: DETALLE POR FILA (solo Supervisor) ============== */
+  function actualizarPanelDetalleFilas(){
+    var panel = document.getElementById("panel-detalle-filas");
+    var cont = document.getElementById("detalle-filas-lista");
+    if(!panel || !cont) return;
+    var esNoche = estado.turno === "Turno 3 - Nocturno";
+    panel.style.display = esNoche ? "block" : "none";
+    if(!esNoche) return;
+    cont.innerHTML = "";
+    FILAS_IDS.forEach(function(fid){
+      var freg = registroFilaActual(fid);
+      var total = 0; freg.horas.forEach(function(h){ total += (h.cargado||0); });
+      var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
+      var item = document.createElement("div");
+      item.className = "hist-item";
+      item.innerHTML =
+        '<span class="hist-fecha">' + escapeAttr(nombreFila(fid)) +
+          (freg.nombre ? ('<br><span style="font-weight:400;color:var(--text-soft);font-size:10.5px;">'+escapeAttr(freg.nombre)+'</span>') : '') +
+        '</span>' +
+        '<span class="hist-info">' + (obs ? escapeAttr(obs) : 'Sin observaci\u00f3n') + '</span>' +
+        '<span class="hist-pct" style="color:var(--amber);">' + total + '</span>';
+      cont.appendChild(item);
+    });
+  }
 
   /* ============== PLANES (solo Backus, en vivo) ============== */
   function renderPlanes(){
@@ -1238,10 +1672,10 @@
 
   /* ============== GRAFICO PRINCIPAL (solo Backus, canvas nativo) ============== */
   function dibujarGrafico(){
-    var reg = registroActual();
-    if(!reg) return;
-    var meta = calcularPorcentajes();
-    var horas = reg.horas;
+    var bundle = obtenerHorasCalculadas();
+    if(!bundle) return;
+    var horas = bundle.horas;
+    var meta = bundle.meta;
     var canvas = document.getElementById("grafico");
     var wrap = canvas.parentElement;
     if(!wrap || !horas.length) return;
@@ -1323,7 +1757,7 @@
       ctx.fillText(h.hora, x, y);
     });
 
-    var actual = horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0};
+    var actual = bundle.esNoche ? (horas[horas.length-1] || {pct:0, acumCargado:0}) : (horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0});
     var pctUlt = Math.round((actual.pct||0)*100);
     var dot = document.getElementById("estado-dot");
     var txt = document.getElementById("estado-txt");
@@ -1337,7 +1771,7 @@
     pctEl.textContent = pctUlt + "%";
     pctEl.style.color = color;
 
-    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(reg.transportesProgramados||0);
+    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(meta||0);
   }
 
   /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login, en vivo) ============== */
@@ -1391,11 +1825,11 @@
   function actualizarDashboardInicio(){
     var totalArmado = 0, totalCargado = 0, meta = 0;
     if(filtroInicioActual !== "todos"){
-      var c = calcularAcumuladoRegistro(obtenerRegistroPorTurno(filtroInicioActual));
+      var c = calcularAcumuladoRegistro(obtenerRegistroPorTurno(filtroInicioActual), filtroInicioActual);
       totalArmado = c.armado; totalCargado = c.cargado; meta = c.meta;
     } else {
       TURNOS_VALIDOS.forEach(function(t){
-        var c2 = calcularAcumuladoRegistro(obtenerRegistroPorTurno(t));
+        var c2 = calcularAcumuladoRegistro(obtenerRegistroPorTurno(t), t);
         totalArmado += c2.armado; totalCargado += c2.cargado; meta += c2.meta;
       });
     }
@@ -1431,6 +1865,28 @@
     }, 150);
   });
 
+  /* ============== HISTORICO (compartido en /historico, EN VIVO para todos) ============== */
+  function guardarEnHistorico(){
+    var bundle = obtenerHorasCalculadas();
+    if(!bundle) return;
+    var horas = bundle.horas, meta = bundle.meta;
+    var esNoche = bundle.esNoche;
+    var idx = esNoche ? (horas.length-1) : horaSelIdx;
+    var h = horas[idx];
+    if(!h) return;
+    var pct = meta > 0 ? (h.acumCargado||0)/meta : 0;
+    var registro = {
+      ts: Date.now(),
+      fecha: estado.fecha, hora: esNoche ? "Acumulado" : h.hora, turno: estado.turno,
+      supervisor: estado.nombreBackus || "", encargadoArmado: estado.nombreLavoro || "",
+      subarea: estado.subarea, area: estado.area,
+      transportesProgramados: meta,
+      armado: h.armado||0, cargado: h.cargado||0,
+      acumArmado: h.acumArmado||0, acumCargado: h.acumCargado||0, pct: pct
+    };
+    db.ref("historico/" + claveHistorico(estado.fecha, estado.turno, esNoche ? "acumulado" : h.hora)).set(registro);
+  }
+
   /* ============== BOTON ACTUALIZAR (fuerza guardado del historico) ============== */
   document.getElementById("btn-actualizar").addEventListener("click", function(){
     var reg = registroActual();
@@ -1442,24 +1898,6 @@
     toast("Hora " + reg.horas[horaSelIdx].hora + " actualizada");
   });
 
-  /* ============== HISTORICO (compartido en /historico, EN VIVO para todos) ============== */
-  function guardarEnHistorico(){
-    calcularPorcentajes();
-    var reg = registroActual();
-    if(!reg) return;
-    var h = reg.horas[horaSelIdx];
-    var pct = reg.transportesProgramados > 0 ? (h.acumCargado||0)/reg.transportesProgramados : 0;
-    var registro = {
-      ts: Date.now(),
-      fecha: estado.fecha, hora: h.hora, turno: estado.turno,
-      supervisor: estado.nombreBackus || "", encargadoArmado: estado.nombreLavoro || "",
-      subarea: estado.subarea, area: estado.area,
-      transportesProgramados: reg.transportesProgramados,
-      armado: h.armado||0, cargado: h.cargado||0,
-      acumArmado: h.acumArmado||0, acumCargado: h.acumCargado||0, pct: pct
-    };
-    db.ref("historico/" + claveHistorico(estado.fecha, estado.turno, h.hora)).set(registro);
-  }
 
   function renderHistorico(){
     var cont = document.getElementById("hist-lista");
@@ -1531,10 +1969,9 @@
   }
   function pctCumplimientoActual(){
     if(!estado || !estado.turno) return 0;
-    calcularPorcentajes();
-    var reg = registroActual();
-    if(!reg || !reg.horas.length) return 0;
-    return reg.horas[reg.horas.length-1].pct || 0;
+    var bundle = obtenerHorasCalculadas();
+    if(!bundle || !bundle.horas.length) return 0;
+    return bundle.horas[bundle.horas.length-1].pct || 0;
   }
   function reproducirBeep(){
     try{
@@ -1581,7 +2018,7 @@
       caja.classList.remove("alerta");
     } else { caja.textContent = "-"; caja.classList.remove("alerta"); }
   }
-  function actualizarUIPlanAccion(){ actualizarPlanAccionApp(); actualizarAlertaInicio(); }
+  function actualizarUIPlanAccion(){ actualizarPlanAccionApp(); actualizarAlertaInicio(); actualizarUIPlanAccionFila(); }
 
   function dispararAlarma(){
     if(alarmaActiva) return;
@@ -1603,10 +2040,47 @@
     if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){ dispararAlarma(); }
     else { actualizarUIPlanAccion(); }
   }
+
+  /* ============== ALARMA: DATOS DE CARGADO FALTANTES POR HORA (SOLO TURNO NOCHE) ==============
+     Suena si, para alguna de las 7 horas habilitadas, ya paso el momento
+     limite (el inicio de la SIGUIENTE hora habilitada) y NINGUNA de las
+     4 filas subio Cargados en esa hora. No aplica a turno tarde ni dia. */
+  var alarmaFilasNocheActiva = false;
+  var alarmaFilasNocheSonidoId = null;
+
+  function dispararAlarmaFilasNoche(){
+    if(alarmaFilasNocheActiva) return;
+    alarmaFilasNocheActiva = true;
+    if(alarmaFilasNocheSonidoId) clearInterval(alarmaFilasNocheSonidoId);
+    reproducirBeep();
+    alarmaFilasNocheSonidoId = setInterval(reproducirBeep, 1500);
+    toast("\u26A0 Hay una hora sin Cargados subidos por ninguna fila.");
+  }
+  function detenerAlarmaFilasNoche(){
+    alarmaFilasNocheActiva = false;
+    if(alarmaFilasNocheSonidoId){ clearInterval(alarmaFilasNocheSonidoId); alarmaFilasNocheSonidoId = null; }
+  }
+  function verificarAlarmaFilasNoche(){
+    if(rolActual !== "backus" || estado.turno !== "Turno 3 - Nocturno"){ detenerAlarmaFilasNoche(); return; }
+    var reg = registroActual();
+    if(!reg){ detenerAlarmaFilasNoche(); return; }
+    var agregadas = horasAgregadasNoche(reg);
+    var transcurrido = minutosDesdeInicioTurno();
+    if(transcurrido === null){ detenerAlarmaFilasNoche(); return; }
+    var hayFaltante = false;
+    for(var i=0; i<OFFSETS_FILA_NOCHE.length; i++){
+      var siguienteOffset = (i < OFFSETS_FILA_NOCHE.length-1) ? OFFSETS_FILA_NOCHE[i+1] : (OFFSETS_FILA_NOCHE[i]+1);
+      var limiteMin = siguienteOffset * 60;
+      if(transcurrido >= limiteMin && (agregadas[i].cargado||0) === 0){ hayFaltante = true; break; }
+    }
+    if(hayFaltante) dispararAlarmaFilasNoche(); else detenerAlarmaFilasNoche();
+  }
+
   function iniciarMonitorAlarma(){
     if(monitorAlarmaId) clearInterval(monitorAlarmaId);
     verificarAlarma();
-    monitorAlarmaId = setInterval(verificarAlarma, 20000);
+    verificarAlarmaFilasNoche();
+    monitorAlarmaId = setInterval(function(){ verificarAlarma(); verificarAlarmaFilasNoche(); }, 20000);
   }
   document.querySelectorAll(".plan-accion-display").forEach(function(el){
     el.addEventListener("click", function(){
@@ -1763,12 +2237,18 @@
   /* ============== RENDER GENERAL ============== */
   function render(){
     if(rolActual === "sorting"){ renderSorting(); return; }
+    aplicarClasesSubrolBackus();
+    if(rolActual === "backus" && document.body.classList.contains("es-fila-backus")){
+      renderFilaBackus();
+      return;
+    }
     bindCabecera();
     bindInfoLavoro();
     renderHorasGrid();
     bindDatosHora();
     renderPlanes();
     dibujarGrafico();
+    actualizarPanelDetalleFilas();
     if(rolActual === "backus") renderHistorico();
     actualizarMensaje();
     actualizarMensajeArmado();
@@ -1777,11 +2257,18 @@
 
   /* ============== INICIO ============== */
   window.addEventListener("DOMContentLoaded", function(){
+    restaurarInfoSesion();
     suscribirComun();
     suscribirHistorico();
     iniciarMonitorAlarma();
     actualizarRelojSorting();
     setInterval(actualizarRelojSorting, 1000);
+    actualizarRelojGenerico("backus-reloj");
+    actualizarRelojGenerico("fila-backus-reloj");
+    setInterval(function(){
+      actualizarRelojGenerico("backus-reloj");
+      actualizarRelojGenerico("fila-backus-reloj");
+    }, 1000);
 
     var sesion = leerSesion(SESSION_KEY);
     if(sesion === "backus" || sesion === "lavoro" || sesion === "sorting"){
