@@ -426,6 +426,7 @@
         <div class="campo-mini"><label>Area</label><input id="c-area"></div>
         <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-display" readonly value="-" title="Toca para silenciar la alarma"></div>
         <div class="campo-mini full"><label>Monitoreo</label><input id="c-monitoreo"></div>
+        <div class="campo-mini full"><label>Total PH del d&iacute;a</label><input id="c-total-ph" inputmode="numeric" value="0"></div>
       </div>
 
       <div class="fila-transp">
@@ -504,6 +505,30 @@
       </div>
     </section>
 
+    <!-- Centralizado (solo Externo/Lavoro) -->
+    <section class="panel solo-lavoro">
+      <div class="panel-title small">Centralizado</div>
+      <div class="grid2">
+        <div class="campo-mini">
+          <label>Hora</label>
+          <select id="cent-hora">
+            <option value="" selected disabled>Selecciona</option>
+            <option value="7:00">7:00</option>
+            <option value="9:30">9:30</option>
+            <option value="1:00">1:00</option>
+            <option value="3:30">3:30</option>
+            <option value="6:00">6:00</option>
+          </select>
+        </div>
+        <div class="campo-mini">
+          <label>Cantidad PH</label>
+          <input id="cent-cantidad" inputmode="numeric" value="0">
+        </div>
+      </div>
+      <button class="btn btn-amber" id="cent-btn-guardar" type="button" style="margin-top:10px;">Guardar registro</button>
+      <div class="sorting-total-personal" id="cent-resumen" style="margin-top:12px;">Has armado 0 / Total Backus 0</div>
+    </section>
+
     <section class="panel solo-sorting">
       <div class="marca-row">
         <span class="marca-ab">AB InBev</span>
@@ -515,6 +540,10 @@
     <section class="panel solo-sorting">
       <div class="panel-title small">Bloques</div>
       <div id="bloques-lista"></div>
+      <div class="estado-fila" id="sorting-dia-estado-fila" style="display:none;">
+        <span class="dot" id="sorting-dia-dot"></span>
+        <span class="estado-txt" id="sorting-dia-txt">En Proceso</span>
+      </div>
     </section>
 
     <section class="panel solo-sorting">
@@ -530,7 +559,7 @@
       </label>
     </section>
 
-    <section class="panel solo-sorting">
+    <section class="panel solo-sorting" id="panel-estatus-bloques-clasico">
       <div class="caja-estatus" id="btn-estatus-sorting" style="width:100%;">
         <span class="led"></span>
         <span>ESTATUS DE BLOQUES</span>
@@ -559,6 +588,12 @@
       <div id="detalle-filas-lista"></div>
     </section>
 
+    <!-- Linea de tiempo de Sorting (solo lectura, adicional al grafico de Cargados) -->
+    <section class="panel solo-backus solo-sup-backus">
+      <div class="panel-title small">L&iacute;nea de tiempo Sorting (Turno D&iacute;a)<span class="tag" id="backus-linea-sorting-tag">--</span></div>
+      <div id="backus-linea-sorting"></div>
+    </section>
+
     <section class="panel oculto-sorting panel-editor-horas-clasico">
       <div class="panel-title">
         <span class="solo-backus">Editar datos</span>
@@ -585,6 +620,10 @@
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn" id="fb-obs-menos" type="button">&minus;</button>
         <button class="btn" id="fb-obs-mas" type="button">+</button>
+      </div>
+      <div class="campo-dato" id="fb-camiones-wrap" style="display:none;margin-top:10px;">
+        <label>&iquest;Cu&aacute;ntos camiones no llegaron?</label>
+        <input id="fb-camiones-faltantes" inputmode="numeric" value="0">
       </div>
     </section>
 
@@ -662,6 +701,8 @@
 
   // Lista fija de bloques de Sorting (ya no se guardan por turno en Firebase:
   // solo son opciones de seleccion). Orden exacto pedido, sin "Bloque 1".
+  // Se usa SOLO cuando el turno de Sorting NO es "Turno 1 - Ma\u00f1ana"
+  // (Tarde/Noche); para Turno Dia se usa el sistema de 3 horarios fijos.
   var BLOQUES_SORTING = [
     { nombre:"Bloque 4" },
     { nombre:"Bloque 3" },
@@ -669,6 +710,31 @@
     { nombre:"Bloque extra" },
     { nombre:"FILA 4" }
   ];
+
+  // Sorting / Turno Dia: 3 bloques con hora limite fija. Un bloque se
+  // considera "entregado" SOLO al tocar Compartir por WhatsApp (el check
+  // ya no existe en este modo). De 11:00 a 11:59 es Refrigerio: no cuenta
+  // como atraso ni suena alarma en esa ventana.
+  var SORTING_DIA_BLOQUES = [
+    { id:"b930", label:"9:30 am", h:9, m:30 },
+    { id:"b100", label:"1:00 pm", h:13, m:0 },
+    { id:"b330", label:"3:30 pm", h:15, m:30 }
+  ];
+  var SORTING_DIA_REFRIGERIO_INICIO_MIN = 11*60;
+  var SORTING_DIA_REFRIGERIO_FIN_MIN = 12*60;
+  function esTurnoDia(){ return estado.turno === "Turno 1 - Ma\u00f1ana"; }
+  function enRefrigerioSortingDia(){
+    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    return ahoraMin >= SORTING_DIA_REFRIGERIO_INICIO_MIN && ahoraMin < SORTING_DIA_REFRIGERIO_FIN_MIN;
+  }
+  function normalizarDiaBloques(datos){
+    var base = {};
+    SORTING_DIA_BLOQUES.forEach(function(b){ base[b.id] = { entregado:false, horaEnvio:"" }; });
+    if(datos && typeof datos === "object"){
+      Object.keys(datos).forEach(function(k){ if(base[k]) base[k] = Object.assign({}, base[k], datos[k]); });
+    }
+    return base;
+  }
 
   // ABInBev / Turno Noche: sistema de filas.
   var FILAS_IDS = ["f1","f2","f3","f4"];
@@ -690,8 +756,10 @@
     "Producto Bloqueado x calidad",
     "Barriles en el s\u00f3tano",
     "Producto Terminado sin desencimar",
-    "Generaci\u00f3n de Orden Interna x Producto sin stock/Frescura"
+    "Generaci\u00f3n de Orden Interna x Producto sin stock/Frescura",
+    "Falta Disponibilidad de Camiones"
   ];
+  var OBS_FALTA_CAMIONES = "Falta Disponibilidad de Camiones";
 
   function horaLabel(h24){
     var h = ((h24 % 24) + 24) % 24;
@@ -815,6 +883,7 @@
     filaBackus: "", // "f1".."f4" o "sup" (solo aplica a rol backus en Turno Noche)
     subarea:"T2", fecha: fechaHoyStr(), area:"LOG",
     monitoreo:"Unidades cargadas x horas planificadas",
+    totalPHDia: 0, // lo edita solo el Supervisor Backus; lo lee tambien Externo
     planes: planesPorDefecto()
   };
   var horaSelIdx = 0;      // hora seleccionada en el editor clasico (Lavoro / Backus Dia-Tarde)
@@ -875,6 +944,7 @@
         db.ref("comun").set({
           subarea:"T2", area:"LOG", fecha: fechaHoyStr(),
           monitoreo:"Unidades cargadas x horas planificadas",
+          totalPHDia: 0,
           planes: planesPorDefecto()
         });
       }
@@ -885,10 +955,12 @@
       fijarSiNoEnfocado(document.getElementById("c-area"), v.area !== undefined ? v.area : estado.area);
       fijarSiNoEnfocado(document.getElementById("c-fecha"), v.fecha || estado.fecha);
       fijarSiNoEnfocado(document.getElementById("c-monitoreo"), v.monitoreo !== undefined ? v.monitoreo : estado.monitoreo);
+      fijarSiNoEnfocado(document.getElementById("c-total-ph"), v.totalPHDia !== undefined ? v.totalPHDia : estado.totalPHDia);
 
       estado.subarea = v.subarea !== undefined ? v.subarea : estado.subarea;
       estado.area = v.area !== undefined ? v.area : estado.area;
       estado.monitoreo = v.monitoreo !== undefined ? v.monitoreo : estado.monitoreo;
+      estado.totalPHDia = v.totalPHDia !== undefined ? v.totalPHDia : estado.totalPHDia;
       estado.planes = normalizarPlanes(v.planes);
       var fechaNueva = v.fecha || estado.fecha || fechaHoyStr();
       var fechaCambio = fechaNueva !== estado.fecha;
@@ -898,6 +970,7 @@
       if(tituloGrafico) tituloGrafico.childNodes[0].nodeValue = estado.monitoreo;
 
       suscribirFecha(estado.fecha);
+      if(rolActual === "lavoro") actualizarResumenCentralizado();
       if(!fechaCambio){
         renderPlanes();
         if(rolActual && rolActual !== "sorting") render();
@@ -948,6 +1021,46 @@
       cacheSorting = snap.val() || {};
       if(rolActual === "sorting"){ renderSorting(); }
     });
+  }
+
+  // Lectura de solo lectura para que el Supervisor Backus vea en vivo el
+  // estado de los 3 bloques de Sorting Turno Dia (independiente de en que
+  // turno haya entrado el propio Backus). No escribe nada aqui.
+  var refSortingDiaParaBackus = null;
+  var cacheSortingDiaParaBackus = null;
+  function suscribirSortingDiaParaBackus(){
+    var claveF = fk(fechaLiveStr());
+    if(refSortingDiaParaBackus) refSortingDiaParaBackus.off();
+    refSortingDiaParaBackus = db.ref("sorting/" + claveF + "/t1/diaBloques");
+    refSortingDiaParaBackus.on("value", function(snap){
+      cacheSortingDiaParaBackus = normalizarDiaBloques(snap.val());
+      if(rolActual === "backus" && !document.body.classList.contains("es-fila-backus")){ renderLineaTiempoBackus(); }
+    });
+  }
+  function renderLineaTiempoBackus(){
+    var cont = document.getElementById("backus-linea-sorting");
+    var tag = document.getElementById("backus-linea-sorting-tag");
+    if(!cont) return;
+    var bloques = cacheSortingDiaParaBackus || normalizarDiaBloques(null);
+    var enRefrigerio = enRefrigerioSortingDia();
+    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var entregados = 0;
+    cont.innerHTML = "";
+    SORTING_DIA_BLOQUES.forEach(function(b){
+      var eb = bloques[b.id];
+      if(eb.entregado) entregados++;
+      var vencido = !eb.entregado && !enRefrigerio && ahoraMin >= (b.h*60+b.m);
+      var color = eb.entregado ? "var(--verde)" : (vencido ? "var(--rojo)" : "var(--text-soft)");
+      var estadoTxt = eb.entregado ? ("Entregado " + (eb.horaEnvio||"")) : (enRefrigerio ? "Refrigerio" : (vencido ? "Atrasado" : "En Proceso"));
+      var item = document.createElement("div");
+      item.className = "hist-item";
+      item.innerHTML =
+        '<span class="hist-fecha">' + escapeAttr(b.label) + '</span>' +
+        '<span class="hist-info">' + escapeAttr(estadoTxt) + '</span>' +
+        '<span class="hist-pct" style="color:' + color + ';">&#9679;</span>';
+      cont.appendChild(item);
+    });
+    if(tag) tag.textContent = entregados + "/" + SORTING_DIA_BLOQUES.length;
   }
 
   /* ============== SUSCRIPCION A /historico (en vivo, solo se muestra a Backus) ============== */
@@ -1004,12 +1117,13 @@
     if(!estado.turno) return null;
     var turnoId = TURNO_ID[estado.turno];
     var r = cacheSorting[turnoId];
-    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"" };
+    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"", diaBloques: normalizarDiaBloques(null) };
     return {
       personalFijo: (r.personalFijo!==undefined? r.personalFijo:12),
       personalRefuerzo: (r.personalRefuerzo!==undefined? r.personalRefuerzo:0),
       apoyoValidacion: !!r.apoyoValidacion,
-      seleccion: (r.seleccion!==undefined && r.seleccion!==null) ? r.seleccion : ""
+      seleccion: (r.seleccion!==undefined && r.seleccion!==null) ? r.seleccion : "",
+      diaBloques: normalizarDiaBloques(r.diaBloques)
     };
   }
 
@@ -1024,7 +1138,8 @@
     return {
       horas: normalizarHorasFila(f && f.horas),
       observaciones: normalizarObservaciones(f && f.observaciones),
-      nombre: (f && f.nombre) || ""
+      nombre: (f && f.nombre) || "",
+      camionesFaltantes: (f && f.camionesFaltantes) || 0
     };
   }
   function totalCargadoFila(filaId, reg){
@@ -1049,6 +1164,17 @@
     horasAgregadasNoche(reg).forEach(function(h){ total += (h.cargado||0); });
     return total;
   }
+  // Suma de "camiones que no llegaron por falta de disponibilidad" que cada
+  // fila reporto (junto con la observacion OBS_FALTA_CAMIONES). Este numero
+  // NUNCA se cuenta como Cargado real: solo se usa para que el GRAFICO
+  // llegue en verde al 100%, sin generar rojo por un motivo ajeno al trabajo
+  // de las filas. El status real (mensajes) siempre muestra el dato sin este
+  // ajuste, por separado.
+  function totalCamionesFaltantes(reg){
+    var total = 0;
+    FILAS_IDS.forEach(function(fid){ total += registroFilaActual(fid, reg).camionesFaltantes; });
+    return total;
+  }
   // Bundle listo para graficar/reportar: elige la fuente correcta segun el
   // turno (horas clasicas para Dia/Tarde, agregado de filas para Noche) y
   // calcula acumulados/porcentajes sobre esa copia (no toca registro.horas
@@ -1059,16 +1185,24 @@
     var esNoche = estado.turno === "Turno 3 - Nocturno";
     var horas = esNoche ? horasAgregadasNoche(reg) : reg.horas;
     var meta = reg.transportesProgramados || 0;
+    var totalReal = 0;
+    horas.forEach(function(h){ totalReal += (h.cargado||0); });
+    var boost = esNoche ? totalCamionesFaltantes(reg) : 0;
+    if(esNoche && boost > 0 && horas.length){
+      // Se refleja en el ultimo tramo para que la linea del grafico cierre
+      // en verde/100%, sin inventar avance en horas que no ocurrieron.
+      horas[horas.length-1].cargado += boost;
+    }
     var sumaArmado = 0, sumaCargado = 0;
     horas.forEach(function(h){
       sumaArmado += (h.armado||0);
       sumaCargado += (h.cargado||0);
       h.acumArmado = sumaArmado;
       h.acumCargado = sumaCargado;
-      h.pct = meta > 0 ? sumaCargado / meta : 0;
+      h.pct = meta > 0 ? Math.min(1, sumaCargado / meta) : 0;
       h.pctArmado = meta > 0 ? sumaArmado / meta : 0;
     });
-    return { reg: reg, horas: horas, meta: meta, esNoche: esNoche };
+    return { reg: reg, horas: horas, meta: meta, esNoche: esNoche, totalReal: totalReal, totalBoost: boost };
   }
 
   function calcularAcumuladoRegistro(reg, turnoNombre){
@@ -1091,6 +1225,7 @@
   var guardarComunArea = debounce(function(v){ db.ref("comun/area").set(v); }, 400);
   var guardarComunFecha = debounce(function(v){ db.ref("comun/fecha").set(v); }, 500);
   var guardarComunMonitoreo = debounce(function(v){ db.ref("comun/monitoreo").set(v); }, 400);
+  var guardarComunTotalPH = debounce(function(v){ db.ref("comun/totalPHDia").set(v); }, 400);
   var guardarTransportes = debounce(function(v){ db.ref(rutaRegistro("transportesProgramados")).set(v); }, 350);
   var guardarPlan = debounce(function(i, v){ db.ref("comun/planes/"+i+"/accion").set(v); }, 400);
 
@@ -1268,6 +1403,7 @@
     fijarSiNoEnfocado(document.getElementById("c-fecha"), estado.fecha);
     fijarSiNoEnfocado(document.getElementById("c-area"), estado.area);
     fijarSiNoEnfocado(document.getElementById("c-monitoreo"), estado.monitoreo);
+    fijarSiNoEnfocado(document.getElementById("c-total-ph"), estado.totalPHDia || 0);
     fijarSiNoEnfocado(document.getElementById("c-transportes"), reg ? reg.transportesProgramados : 0);
     document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
@@ -1283,18 +1419,70 @@
       estado.monitoreo = this.value; guardarComunMonitoreo(this.value);
       document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
     };
+    document.getElementById("c-total-ph").oninput = function(){
+      var v = Number(this.value)||0;
+      estado.totalPHDia = v;
+      guardarComunTotalPH(v);
+    };
     document.getElementById("c-transportes").oninput = function(){
       var v = Number(this.value)||0;
       guardarTransportes(v);
       dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado(); verificarAlarma();
     };
     actualizarUIPlanAccion();
+    renderLineaTiempoBackus();
   }
 
   function bindInfoLavoro(){
     document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
     document.getElementById("lv-fecha").textContent = estado.fecha || "-";
+    suscribirPHRegistros();
+    actualizarResumenCentralizado();
   }
+
+  /* ============== CENTRALIZADO (solo Externo/Lavoro) ==============
+     Cada registro (hora + cantidad PH) se guarda en /ph_registros,
+     separado por fecha+turno, con push() para que varios dispositivos
+     puedan agregar registros sin pisarse entre si. El resumen "Has
+     armado X" suma todos los registros del turno actual; "Total Backus"
+     es el numero que el Supervisor Backus escribe en su cabecera. */
+  var refPHRegistros = null;
+  var cachePHRegistros = {};
+  var phRegistrosSuscrito = null;
+  function clavePHRegistros(){ return fk(estado.fecha) + "/" + TURNO_ID[estado.turno]; }
+  function suscribirPHRegistros(){
+    if(!estado.turno) return;
+    var clave = clavePHRegistros();
+    if(phRegistrosSuscrito === clave) return;
+    phRegistrosSuscrito = clave;
+    if(refPHRegistros) refPHRegistros.off();
+    refPHRegistros = db.ref("ph_registros/" + clave);
+    refPHRegistros.on("value", function(snap){
+      cachePHRegistros = snap.val() || {};
+      if(rolActual === "lavoro") actualizarResumenCentralizado();
+    });
+  }
+  function totalPHArmadoExterno(){
+    var total = 0;
+    Object.keys(cachePHRegistros).forEach(function(k){ total += (cachePHRegistros[k].cantidad || 0); });
+    return total;
+  }
+  function actualizarResumenCentralizado(){
+    var el = document.getElementById("cent-resumen");
+    if(!el) return;
+    el.textContent = "Has armado " + totalPHArmadoExterno() + " / Total Backus " + (estado.totalPHDia || 0);
+  }
+  document.getElementById("cent-btn-guardar").addEventListener("click", function(){
+    var hora = document.getElementById("cent-hora").value;
+    var cantidad = Number(document.getElementById("cent-cantidad").value) || 0;
+    if(!hora){ toast("Selecciona una hora."); return; }
+    if(!estado.turno){ return; }
+    var nuevaRef = db.ref("ph_registros/" + clavePHRegistros()).push();
+    nuevaRef.set({ hora: hora, cantidad: cantidad, ts: Date.now(), encargado: estado.nombreLavoro || "" });
+    document.getElementById("cent-cantidad").value = 0;
+    document.getElementById("cent-hora").value = "";
+    toast("Registro guardado en Centralizado.");
+  });
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   function generarMensaje(){
@@ -1313,6 +1501,7 @@
       (bundle.esNoche ? "" : ("Hora: " + (h.hora||"-") + "\n")) +
       "Armados (acum.): " + (h.acumArmado||0) + "\n" +
       "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
+      (bundle.esNoche && bundle.totalBoost > 0 ? (bundle.totalReal + "/" + (meta||0) + " Cargados Reales\n") : "") +
       "Cumplimiento: " + pct + "%";
     if(bundle.esNoche){
       msg += "\n\nDETALLE POR FILA:";
@@ -1321,7 +1510,8 @@
         var totalFila = 0;
         freg.horas.forEach(function(hh){ totalFila += (hh.cargado||0); });
         var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
-        msg += "\n" + nombreFila(fid) + ": " + totalFila + " cargados" + (obs ? " - " + obs : "");
+        var hayFalta = freg.observaciones.indexOf(OBS_FALTA_CAMIONES) >= 0;
+        msg += "\n" + nombreFila(fid) + ": " + totalFila + " cargados" + (obs ? " - " + obs : "") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "");
       });
     }
     return msg;
@@ -1517,6 +1707,7 @@
     var freg = registroFilaActual(filaId);
     var total = 0; freg.horas.forEach(function(h){ total += (h.cargado||0); });
     var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
+    var hayFalta = freg.observaciones.indexOf(OBS_FALTA_CAMIONES) >= 0;
     return "STATUS DE CARGA - " + nombreFila(filaId) + "\n" +
       "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
       "Encargado: " + (estado.nombreBackus || "-") + "\n" +
@@ -1524,7 +1715,7 @@
       "Fecha: " + fechaLiveStr() + "\n" +
       "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
       "Cargados (acum. de la fila): " + total + "\n" +
-      "OBSERVACION: " + (obs || "Ninguna");
+      "OBSERVACION: " + (obs || "Ninguna") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "");
   }
   function actualizarMensajeFila(){
     var el = document.getElementById("fb-mensaje-texto");
@@ -1555,8 +1746,15 @@
     var cont = document.getElementById("fb-obs-lista");
     if(!cont) return;
     var enfocado = document.activeElement;
-    if(enfocado && enfocado.classList && enfocado.classList.contains("obs-select")) return; // no interrumpir mientras elige
+    var enCamionesInput = enfocado && enfocado.id === "fb-camiones-faltantes";
     var freg = registroFilaActual(estado.filaBackus);
+    var hayFaltaCamiones = freg.observaciones.indexOf(OBS_FALTA_CAMIONES) >= 0;
+    var wrapCamiones = document.getElementById("fb-camiones-wrap");
+    if(wrapCamiones){
+      wrapCamiones.style.display = hayFaltaCamiones ? "block" : "none";
+      if(!enCamionesInput) fijarSiNoEnfocado(document.getElementById("fb-camiones-faltantes"), freg.camionesFaltantes || 0);
+    }
+    if(enfocado && enfocado.classList && enfocado.classList.contains("obs-select")) return; // no interrumpir mientras elige
     cont.innerHTML = "";
     freg.observaciones.forEach(function(valor, i){
       var row = document.createElement("div");
@@ -1585,6 +1783,11 @@
     if(freg.observaciones.length <= 1){ toast("Debe quedar al menos 1 espacio de observaci\u00f3n."); return; }
     var nuevas = freg.observaciones.slice(0, -1);
     db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones")).set(nuevas);
+  });
+  document.getElementById("fb-camiones-faltantes").addEventListener("input", function(){
+    var valor = Number(this.value)||0;
+    db.ref(rutaRegistro("filas/"+estado.filaBackus+"/camionesFaltantes")).set(valor);
+    actualizarMensajeFila();
   });
 
   function renderFilaBackus(){
@@ -2076,11 +2279,53 @@
     if(hayFaltante) dispararAlarmaFilasNoche(); else detenerAlarmaFilasNoche();
   }
 
+  /* ============== ALARMA: SORTING / TURNO DIA (bloque no entregado a su hora) ==============
+     Suena SOLO para el rol Sorting, SOLO cuando su turno es "Turno 1 -
+     Ma\u00f1ana", y SOLO fuera de la ventana de Refrigerio (11:00-11:59).
+     Independiente de las demas alarmas (no toca alarmaActiva ni la de
+     filas de Backus). */
+  var alarmaSortingDiaActiva = false;
+  var alarmaSortingDiaSonidoId = null;
+
+  function dispararAlarmaSortingDia(){
+    if(alarmaSortingDiaActiva) return;
+    alarmaSortingDiaActiva = true;
+    if(alarmaSortingDiaSonidoId) clearInterval(alarmaSortingDiaSonidoId);
+    reproducirBeep();
+    alarmaSortingDiaSonidoId = setInterval(reproducirBeep, 1500);
+    toast("\u26A0 Hay un bloque sin entregar despu\u00e9s de su hora l\u00edmite.");
+  }
+  function detenerAlarmaSortingDia(){
+    alarmaSortingDiaActiva = false;
+    if(alarmaSortingDiaSonidoId){ clearInterval(alarmaSortingDiaSonidoId); alarmaSortingDiaSonidoId = null; }
+  }
+  function verificarAlarmaSortingDia(){
+    if(rolActual !== "sorting" || !esTurnoDia()){ detenerAlarmaSortingDia(); return; }
+    var reg = registroSortingActual();
+    if(!reg){ detenerAlarmaSortingDia(); return; }
+    if(enRefrigerioSortingDia()){ detenerAlarmaSortingDia(); return; }
+    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var hayVencido = SORTING_DIA_BLOQUES.some(function(b){
+      var eb = reg.diaBloques[b.id];
+      return !eb.entregado && ahoraMin >= (b.h*60+b.m);
+    });
+    if(hayVencido) dispararAlarmaSortingDia(); else detenerAlarmaSortingDia();
+  }
+
   function iniciarMonitorAlarma(){
     if(monitorAlarmaId) clearInterval(monitorAlarmaId);
     verificarAlarma();
     verificarAlarmaFilasNoche();
-    monitorAlarmaId = setInterval(function(){ verificarAlarma(); verificarAlarmaFilasNoche(); }, 20000);
+    verificarAlarmaSortingDia();
+    monitorAlarmaId = setInterval(function(){
+      verificarAlarma();
+      verificarAlarmaFilasNoche();
+      verificarAlarmaSortingDia();
+      // El estado de los bloques de Sorting Dia depende del reloj (no solo
+      // de los datos), asi que se refresca visualmente cada 20s tambien.
+      if(rolActual === "sorting" && esTurnoDia()){ renderBloquesDia(); }
+      if(rolActual === "backus" && !document.body.classList.contains("es-fila-backus")){ renderLineaTiempoBackus(); }
+    }, 20000);
   }
   document.querySelectorAll(".plan-accion-display").forEach(function(el){
     el.addEventListener("click", function(){
@@ -2112,8 +2357,14 @@
      bloque marcado a la vez -> queda descartado por diseno el "marcar
      todo de golpe sin querer". */
   function renderBloques(){
-    var reg = registroSortingActual();
+    if(esTurnoDia()){
+      renderBloquesDia();
+      return;
+    }
     var cont = document.getElementById("bloques-lista");
+    var elEstadoFila = document.getElementById("sorting-dia-estado-fila");
+    if(elEstadoFila) elEstadoFila.style.display = "none";
+    var reg = registroSortingActual();
     if(!reg || !cont) return;
     cont.innerHTML = "";
     BLOQUES_SORTING.forEach(function(b){
@@ -2138,6 +2389,63 @@
         db.ref(rutaSorting("seleccion")).set(this.checked ? nombre : "");
       });
     });
+  }
+
+  /* ============== SORTING / TURNO DIA: 3 BLOQUES CON HORA FIJA ==============
+     Sistema independiente del de Tarde/Noche (no comparte ningun campo:
+     usa "diaBloques", el otro usa "seleccion"). Un bloque solo se marca
+     como entregado al tocar "Compartir por WhatsApp"; el check no existe
+     en este modo. De 11:00 a 11:59 es Refrigerio: no cuenta como atraso
+     ni dispara la alarma. */
+  function renderBloquesDia(){
+    var reg = registroSortingActual();
+    var cont = document.getElementById("bloques-lista");
+    if(!reg || !cont) return;
+    var enRefrigerio = enRefrigerioSortingDia();
+    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    cont.innerHTML = "";
+    SORTING_DIA_BLOQUES.forEach(function(b){
+      var eb = reg.diaBloques[b.id];
+      var deadlineMin = b.h*60 + b.m;
+      var vencido = !eb.entregado && !enRefrigerio && ahoraMin >= deadlineMin;
+      var color = eb.entregado ? "var(--verde)" : (vencido ? "var(--rojo)" : "var(--text-soft)");
+      var estadoTxt = eb.entregado ? ("Entregado " + (eb.horaEnvio||"")) : (enRefrigerio ? "Refrigerio" : (vencido ? "Atrasado" : "En Proceso"));
+      var fila = document.createElement("div");
+      fila.className = "bloque-item";
+      fila.innerHTML =
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="bloque-nombre">' + escapeAttr(b.label) + '</div>' +
+          '<small style="color:' + color + ';font-weight:600;">' + escapeAttr(estadoTxt) + '</small>' +
+        '</div>' +
+        '<button class="btn btn-amber" style="width:auto;padding:9px 14px;flex:none;" data-id="' + b.id + '" type="button">Compartir</button>';
+      cont.appendChild(fila);
+    });
+    cont.querySelectorAll("button[data-id]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = this.dataset.id;
+        var b = SORTING_DIA_BLOQUES.filter(function(x){ return x.id === id; })[0];
+        var horaEnvio = horaLiveStr();
+        db.ref(rutaSorting("diaBloques/"+id+"/entregado")).set(true);
+        db.ref(rutaSorting("diaBloques/"+id+"/horaEnvio")).set(horaEnvio);
+        var msg = "REPORTE DE BLOQUE - SORTING\n" +
+          "Bloque: " + (b ? b.label : id) + "\n" +
+          "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
+          "Encargado: " + (estado.nombreSorting || "-") + "\n" +
+          "Fecha: " + fechaLiveStr() + "\n" +
+          "Hora de Env\u00edo: " + horaEnvio;
+        enviarPorWhatsapp(msg);
+        toast((b ? b.label : id) + " marcado como entregado.");
+      });
+    });
+
+    var elEstadoFila = document.getElementById("sorting-dia-estado-fila");
+    var dot = document.getElementById("sorting-dia-dot");
+    var txt = document.getElementById("sorting-dia-txt");
+    if(elEstadoFila){
+      elEstadoFila.style.display = "flex";
+      if(dot) dot.style.background = enRefrigerio ? "var(--amber)" : "var(--azul)";
+      if(txt) txt.textContent = enRefrigerio ? "Refrigerio" : "En Proceso";
+    }
   }
 
   function bindFuerzaLaboral(){
@@ -2221,7 +2529,10 @@
     actualizarRelojSorting();
     renderBloques();
     bindFuerzaLaboral();
-    actualizarMensajeSorting();
+    var panelClasico = document.getElementById("panel-estatus-bloques-clasico");
+    if(panelClasico) panelClasico.style.display = esTurnoDia() ? "none" : "block";
+    if(!esTurnoDia()) actualizarMensajeSorting();
+    verificarAlarmaSortingDia();
   }
 
   /* ============== COLAPSABLES ============== */
@@ -2260,6 +2571,7 @@
     restaurarInfoSesion();
     suscribirComun();
     suscribirHistorico();
+    suscribirSortingDiaParaBackus();
     iniciarMonitorAlarma();
     actualizarRelojSorting();
     setInterval(actualizarRelojSorting, 1000);
