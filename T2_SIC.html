@@ -539,7 +539,8 @@
 
     <section class="panel solo-sorting">
       <div class="panel-title small">Bloques</div>
-      <div class="chart-wrap" id="sorting-dia-chart-wrap" style="height:170px;display:none;">
+      <div id="sorting-dia-chart-titulo" style="display:none;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--amber);letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;">Seguimiento de Tiempo en Sorting</div>
+      <div class="chart-wrap" id="sorting-dia-chart-wrap" style="height:190px;display:none;">
         <canvas id="grafico-sorting-dia"></canvas>
       </div>
       <div id="bloques-lista"></div>
@@ -754,23 +755,59 @@
     if(isNaN(h) || isNaN(m)) return null;
     return h*60 + m;
   }
-  // Estado (0 o 1) de la linea en un minuto especifico del dia, segun los
-  // 3 bloques: si algun bloque ya vencio y todavia no fue entregado a esa
-  // altura, la linea esta en rojo (1); si todos los bloques vencidos ya
-  // fueron entregados (a tiempo o tarde), esta en verde (0). El Refrigerio
-  // siempre fuerza verde, sin importar si hay un bloque vencido sin entregar.
-  function estadoLineaSortingEn(minuto, bloques){
+  // "Tiempo de demora" (0 a 3.00) de un bloque en un momento dado, respecto
+  // a su hora limite: 1.00 es exactamente la hora limite (frontera entre
+  // verde y rojo). Antes/antes de tiempo -> menor a 1.00 (verde). Cuanto
+  // mas tarde -> mayor a 1.00 (rojo), tope en 3.00. El Refrigerio siempre
+  // fuerza el valor a 0 (verde), sin importar si hay algo vencido sin
+  // entregar.
+  function valorDemoraBloque(referenciaMin, deadlineMin){
+    var v = 1 + (referenciaMin - deadlineMin) / 60;
+    return Math.max(0, Math.min(3, v));
+  }
+  function forzarRefrigerio(minuto, valor){
     if(minuto >= SORTING_DIA_REFRIGERIO_INICIO_MIN && minuto < SORTING_DIA_REFRIGERIO_FIN_MIN) return 0;
-    var y = 0;
+    return valor;
+  }
+  // Construye la secuencia de puntos (x=minuto del dia, y=0..3) de la
+  // linea unica, hasta el instante "finDibujo" (normalmente "ahora"):
+  // - Antes de la hora limite de un bloque: la linea no se mueve (base 0).
+  // - Si no entrega a tiempo: sube en vivo desde la hora limite hasta
+  //   ahora (o hasta que por fin entrega, tarde).
+  // - Al entregar (a tiempo o tarde) queda marcado el valor real logrado
+  //   en ese instante, y despues la linea vuelve a la base (verde).
+  function construirPuntosLineaSorting(bloques, finDibujo){
+    var puntos = [{ x: SORTING_DIA_EJE_INICIO_MIN, y: 0 }];
     SORTING_DIA_BLOQUES.forEach(function(b){
       var deadline = b.h*60 + b.m;
-      if(deadline > minuto) return; // este bloque aun no vence en este instante
+      if(deadline > finDibujo) return; // aun no le toca a este bloque
       var eb = bloques[b.id];
       var entregadoMin = (eb && eb.entregado) ? parsearHoraAMin(eb.horaEnvio) : null;
-      if(entregadoMin !== null && entregadoMin <= minuto) return; // ya resuelto a esta altura
-      y = 1;
+
+      if(entregadoMin !== null){
+        if(entregadoMin > deadline){
+          // Entrego tarde: sube desde el vencimiento hasta el pico real
+          // de la entrega, y despues vuelve a bajar a la base.
+          var xEntrega = Math.min(entregadoMin, finDibujo);
+          var pico = valorDemoraBloque(entregadoMin, deadline);
+          puntos.push({ x: deadline, y: forzarRefrigerio(deadline, 0) });
+          puntos.push({ x: xEntrega, y: forzarRefrigerio(xEntrega, pico), marca: { label: b.label, horaEnvio: eb.horaEnvio, estado: "Con retraso" } });
+          if(xEntrega < finDibujo){ puntos.push({ x: Math.min(xEntrega + 1, finDibujo), y: 0 }); }
+        } else {
+          // Entrego a tiempo (o antes): un solo punto con su valor real.
+          var valorOk = valorDemoraBloque(entregadoMin, deadline);
+          puntos.push({ x: entregadoMin, y: forzarRefrigerio(entregadoMin, valorOk), marca: { label: b.label, horaEnvio: eb.horaEnvio, estado: "A tiempo" } });
+        }
+      } else {
+        // Sigue pendiente: sube en vivo desde el vencimiento hasta ahora.
+        var valorVivo = valorDemoraBloque(finDibujo, deadline);
+        puntos.push({ x: deadline, y: forzarRefrigerio(deadline, 0) });
+        puntos.push({ x: finDibujo, y: forzarRefrigerio(finDibujo, valorVivo), marca: { label: b.label, horaEnvio: "", estado: "Pendiente" } });
+      }
     });
-    return y;
+    var ultimo = puntos[puntos.length - 1];
+    if(ultimo.x < finDibujo){ puntos.push({ x: finDibujo, y: forzarRefrigerio(finDibujo, 0) }); }
+    return puntos;
   }
 
   // ABInBev / Turno Noche: sistema de filas.
@@ -2402,8 +2439,10 @@
     var cont = document.getElementById("bloques-lista");
     var elEstadoFila = document.getElementById("sorting-dia-estado-fila");
     var elChartWrap = document.getElementById("sorting-dia-chart-wrap");
+    var elChartTitulo = document.getElementById("sorting-dia-chart-titulo");
     if(elEstadoFila) elEstadoFila.style.display = "none";
     if(elChartWrap) elChartWrap.style.display = "none";
+    if(elChartTitulo) elChartTitulo.style.display = "none";
     var reg = registroSortingActual();
     if(!reg || !cont) return;
     cont.innerHTML = "";
@@ -2480,19 +2519,32 @@
 
     var elEstadoFila = document.getElementById("sorting-dia-estado-fila");
     var elChartWrap = document.getElementById("sorting-dia-chart-wrap");
+    var elChartTitulo = document.getElementById("sorting-dia-chart-titulo");
     var dot = document.getElementById("sorting-dia-dot");
     var txt = document.getElementById("sorting-dia-txt");
     if(elChartWrap) elChartWrap.style.display = "block";
+    if(elChartTitulo) elChartTitulo.style.display = "block";
     if(elEstadoFila){
       elEstadoFila.style.display = "flex";
-      var estadoAhora = enRefrigerio ? 0 : estadoLineaSortingEn(ahoraMin, reg.diaBloques);
-      if(dot) dot.style.background = enRefrigerio ? "var(--amber)" : (estadoAhora === 1 ? "var(--rojo)" : "var(--verde)");
+      var estadoAhora = 0;
+      SORTING_DIA_BLOQUES.forEach(function(b){
+        var deadline = b.h*60+b.m;
+        if(deadline > ahoraMin) return;
+        var eb = reg.diaBloques[b.id];
+        if(eb && eb.entregado) return;
+        estadoAhora = Math.max(estadoAhora, forzarRefrigerio(ahoraMin, valorDemoraBloque(ahoraMin, deadline)));
+      });
+      if(dot) dot.style.background = enRefrigerio ? "var(--amber)" : (estadoAhora >= 1 ? "var(--rojo)" : "var(--verde)");
       if(txt) txt.textContent = enRefrigerio ? "Refrigerio" : "En Proceso";
     }
     dibujarGraficoSortingDia();
   }
 
-  /* ============== SORTING / TURNO DIA: DIBUJO DEL GRAFICO (canvas nativo) ============== */
+  /* ============== SORTING / TURNO DIA: DIBUJO DEL GRAFICO (canvas nativo) ==============
+     "SEGUIMIENTO DE TIEMPO EN SORTING": fondo dividido en 2 mitades fijas
+     (abajo VERDE, arriba ROJO, frontera en el valor 1.00) y una sola
+     linea blanca que sube/baja segun el tiempo de demora real de cada
+     bloque frente a su hora limite. Eje X 7am-6pm, eje Y 0 a 3.00. */
   function dibujarGraficoSortingDia(){
     var canvas = document.getElementById("grafico-sorting-dia");
     if(!canvas) return;
@@ -2503,7 +2555,7 @@
 
     var dpr = window.devicePixelRatio || 1;
     var cssW = wrap.clientWidth || 300;
-    var cssH = wrap.clientHeight || 160;
+    var cssH = wrap.clientHeight || 180;
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     canvas.style.width = cssW + "px";
@@ -2512,47 +2564,42 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    var padL = 10, padR = 10, padT = 14, padB = 26;
+    var padL = 28, padR = 10, padT = 20, padB = 26;
     var chartW = Math.max(10, cssW - padL - padR);
     var chartH = Math.max(10, cssH - padT - padB);
+    var EJE_Y_MAX = 3;
 
     function xPos(min){
       var clamp = Math.max(SORTING_DIA_EJE_INICIO_MIN, Math.min(min, SORTING_DIA_EJE_FIN_MIN));
       return padL + ((clamp - SORTING_DIA_EJE_INICIO_MIN) / (SORTING_DIA_EJE_FIN_MIN - SORTING_DIA_EJE_INICIO_MIN)) * chartW;
     }
-    function yPos(val){ return padT + (1 - val) * chartH; } // val 0 = abajo (verde), 1 = arriba (rojo)
+    function yPos(val){ return padT + (1 - Math.max(0, Math.min(EJE_Y_MAX, val)) / EJE_Y_MAX) * chartH; }
 
-    /* FONDO ESTATICO escalonado, igual imagen que la de ABInBev pero
-       invertida (aqui VERDE va ABAJO y ROJO ARRIBA) y con los escalones
-       marcados por los 3 HORARIOS DE CORTE de Sorting (9:30am, 1:00pm,
-       3:30pm), no por totales acumulados. Es un tablero fijo: NUNCA se
-       recalcula con datos reales, solo depende de la hora del dia. */
-    var d1 = SORTING_DIA_BLOQUES[0].h*60 + SORTING_DIA_BLOQUES[0].m;
-    var d2 = SORTING_DIA_BLOQUES[1].h*60 + SORTING_DIA_BLOQUES[1].m;
-    var d3 = SORTING_DIA_BLOQUES[2].h*60 + SORTING_DIA_BLOQUES[2].m;
-    var segmentosFondo = [
-      { xIni: SORTING_DIA_EJE_INICIO_MIN, xFin: d1, riesgo: 0 },   // antes del 1er corte: todo verde
-      { xIni: d1, xFin: d2, riesgo: 1/3 },                          // paso el 1er corte
-      { xIni: d2, xFin: d3, riesgo: 2/3 },                          // paso el 2do corte
-      { xIni: d3, xFin: SORTING_DIA_EJE_FIN_MIN, riesgo: 1 }        // paso el 3er corte: maximo riesgo
-    ];
-    segmentosFondo.forEach(function(seg){
-      var xa = xPos(seg.xIni), xb = xPos(seg.xFin);
-      var yLimite = padT + seg.riesgo * chartH; // frontera entre rojo(arriba) y verde(abajo)
-      ctx.fillStyle = "#C00000";
-      ctx.fillRect(xa, padT, xb - xa, yLimite - padT);
-      ctx.fillStyle = "#00B050";
-      ctx.fillRect(xa, yLimite, xb - xa, (padT + chartH) - yLimite);
-    });
+    // FONDO DIVIDIDO EN 2 (fijo, no depende de datos reales): abajo VERDE
+    // (0 a 1.00, a tiempo), arriba ROJO (1.00 a 3.00, tarde).
+    var yFrontera = yPos(1);
+    ctx.fillStyle = "#C00000";
+    ctx.fillRect(padL, padT, chartW, yFrontera - padT);
+    ctx.fillStyle = "#00B050";
+    ctx.fillRect(padL, yFrontera, chartW, (padT + chartH) - yFrontera);
 
-    // Ventana de Refrigerio, sombreada sobre el fondo escalonado
+    // Ventana de Refrigerio, sombreada sobre el fondo
     var xRefIni = xPos(SORTING_DIA_REFRIGERIO_INICIO_MIN);
     var xRefFin = xPos(SORTING_DIA_REFRIGERIO_FIN_MIN);
-    ctx.fillStyle = "rgba(242,169,0,0.28)";
+    ctx.fillStyle = "rgba(242,169,0,0.30)";
     ctx.fillRect(xRefIni, padT, xRefFin - xRefIni, chartH);
 
-    // Etiquetas de hora en el eje X
-    ctx.fillStyle = "#8d99a3";
+    // Eje Y: 0 a 3.00
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "8.5px 'Roboto Mono', monospace";
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [0, 0.5, 1, 1.5, 2, 2.5, 3].forEach(function(v){
+      var y = yPos(v);
+      ctx.fillText(v.toFixed(2).replace(".", ","), padL - 4, y);
+    });
+
+    // Eje X: horas del dia
+    ctx.fillStyle = "#eef1f3";
     ctx.font = "9px Inter, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     [7,9,11,13,15,17].forEach(function(h){
@@ -2565,69 +2612,40 @@
     var ahoraMin = ahora.getHours()*60 + ahora.getMinutes();
     var finDibujo = Math.max(SORTING_DIA_EJE_INICIO_MIN, Math.min(ahoraMin, SORTING_DIA_EJE_FIN_MIN));
 
-    // Instantes clave donde la linea puede cambiar de valor
-    var eventos = [SORTING_DIA_EJE_INICIO_MIN, SORTING_DIA_REFRIGERIO_INICIO_MIN, SORTING_DIA_REFRIGERIO_FIN_MIN, finDibujo];
-    SORTING_DIA_BLOQUES.forEach(function(b){
-      eventos.push(b.h*60 + b.m);
-      var eb = bloques[b.id];
-      if(eb && eb.entregado){
-        var em = parsearHoraAMin(eb.horaEnvio);
-        if(em !== null) eventos.push(em);
-      }
-    });
-    eventos = eventos.filter(function(m){ return m >= SORTING_DIA_EJE_INICIO_MIN && m <= finDibujo; });
-    eventos = Array.from(new Set(eventos)).sort(function(a,b){ return a-b; });
+    var puntos = construirPuntosLineaSorting(bloques, finDibujo);
 
-    // Linea escalonada: solo sube y baja, nunca diagonal
-    if(finDibujo > SORTING_DIA_EJE_INICIO_MIN && eventos.length){
+    // Linea unica blanca, diagonal entre puntos (como en la referencia)
+    if(puntos.length > 1){
       ctx.beginPath();
-      var prevY = null;
-      eventos.forEach(function(m){
-        var val = estadoLineaSortingEn(Math.min(m + 0.5, finDibujo), bloques);
-        var x = xPos(m);
-        var y = yPos(val);
-        if(prevY === null){ ctx.moveTo(x, y); }
-        else { ctx.lineTo(x, prevY); ctx.lineTo(x, y); }
-        prevY = y;
+      puntos.forEach(function(p, i){
+        var x = xPos(p.x), y = yPos(p.y);
+        if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
-      ctx.strokeStyle = "#eef1f3";
+      ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2.5;
       ctx.lineJoin = "round"; ctx.lineCap = "round";
       ctx.stroke();
     }
 
-    // Puntos de los 3 bloques (tocables para el tooltip)
-    var puntos = [];
-    SORTING_DIA_BLOQUES.forEach(function(b){
-      var eb = bloques[b.id];
-      var deadline = b.h*60 + b.m;
-      var xMin, val, estadoTxt, horaMostrar;
-      if(eb && eb.entregado){
-        var em = parsearHoraAMin(eb.horaEnvio);
-        xMin = (em !== null) ? Math.min(em, finDibujo) : deadline;
-        val = 0;
-        estadoTxt = (em !== null && em <= deadline) ? "A tiempo" : "Con retraso";
-        horaMostrar = eb.horaEnvio || "";
-      } else {
-        if(deadline > finDibujo) return; // aun no llega esta hora, no se marca
-        xMin = deadline;
-        val = estadoLineaSortingEn(Math.min(deadline + 0.5, finDibujo), bloques);
-        estadoTxt = "Pendiente";
-        horaMostrar = "";
-      }
-      var px = xPos(xMin), py = yPos(val);
+    // Puntos marcados (los 3 bloques) con su valor numerico arriba, y
+    // guardado para el tooltip al tocar
+    var marcas = [];
+    puntos.forEach(function(p){
+      if(!p.marca) return;
+      var px = xPos(p.x), py = yPos(p.y);
       ctx.beginPath();
-      ctx.arc(px, py, 4.5, 0, Math.PI*2);
-      ctx.fillStyle = val === 1 ? "#e5484d" : "#33d689";
+      ctx.arc(px, py, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = "#ffffff";
       ctx.fill();
-      ctx.beginPath();
-      ctx.arc(px, py, 4.5, 0, Math.PI*2);
-      ctx.strokeStyle = "#171c22";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      puntos.push({ x: px, y: py, label: b.label, horaEnvio: horaMostrar, estado: estadoTxt });
+
+      ctx.font = "600 10px 'Roboto Mono', monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(p.y.toFixed(2).replace(".", ","), px, py - 8);
+
+      marcas.push({ x: px, y: py, label: p.marca.label, horaEnvio: p.marca.horaEnvio, estado: p.marca.estado });
     });
-    canvas._puntosSortingDia = puntos;
+    canvas._puntosSortingDia = marcas;
   }
   (function(){
     var canvasSD = document.getElementById("grafico-sorting-dia");
@@ -2643,7 +2661,7 @@
         });
         if(mejor){
           var texto = mejor.horaEnvio
-            ? ("Bloque " + mejor.label + " entregado " + mejor.horaEnvio + " - " + mejor.estado)
+            ? ("Bloque " + mejor.label + " - " + mejor.horaEnvio + " - " + mejor.estado)
             : ("Bloque " + mejor.label + " - " + mejor.estado);
           toast(texto);
         }
