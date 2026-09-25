@@ -2522,16 +2522,33 @@
     }
     function yPos(val){ return padT + (1 - val) * chartH; } // val 0 = abajo (verde), 1 = arriba (rojo)
 
-    // Fondo: franja verde abajo / roja arriba, como referencia visual fija
-    ctx.fillStyle = "rgba(51,214,137,0.08)";
-    ctx.fillRect(padL, yPos(0.5), chartW, chartH/2);
-    ctx.fillStyle = "rgba(229,72,77,0.08)";
-    ctx.fillRect(padL, padT, chartW, chartH/2);
+    /* FONDO ESTATICO escalonado, igual imagen que la de ABInBev pero
+       invertida (aqui VERDE va ABAJO y ROJO ARRIBA) y con los escalones
+       marcados por los 3 HORARIOS DE CORTE de Sorting (9:30am, 1:00pm,
+       3:30pm), no por totales acumulados. Es un tablero fijo: NUNCA se
+       recalcula con datos reales, solo depende de la hora del dia. */
+    var d1 = SORTING_DIA_BLOQUES[0].h*60 + SORTING_DIA_BLOQUES[0].m;
+    var d2 = SORTING_DIA_BLOQUES[1].h*60 + SORTING_DIA_BLOQUES[1].m;
+    var d3 = SORTING_DIA_BLOQUES[2].h*60 + SORTING_DIA_BLOQUES[2].m;
+    var segmentosFondo = [
+      { xIni: SORTING_DIA_EJE_INICIO_MIN, xFin: d1, riesgo: 0 },   // antes del 1er corte: todo verde
+      { xIni: d1, xFin: d2, riesgo: 1/3 },                          // paso el 1er corte
+      { xIni: d2, xFin: d3, riesgo: 2/3 },                          // paso el 2do corte
+      { xIni: d3, xFin: SORTING_DIA_EJE_FIN_MIN, riesgo: 1 }        // paso el 3er corte: maximo riesgo
+    ];
+    segmentosFondo.forEach(function(seg){
+      var xa = xPos(seg.xIni), xb = xPos(seg.xFin);
+      var yLimite = padT + seg.riesgo * chartH; // frontera entre rojo(arriba) y verde(abajo)
+      ctx.fillStyle = "#C00000";
+      ctx.fillRect(xa, padT, xb - xa, yLimite - padT);
+      ctx.fillStyle = "#00B050";
+      ctx.fillRect(xa, yLimite, xb - xa, (padT + chartH) - yLimite);
+    });
 
-    // Ventana de Refrigerio, sombreada
+    // Ventana de Refrigerio, sombreada sobre el fondo escalonado
     var xRefIni = xPos(SORTING_DIA_REFRIGERIO_INICIO_MIN);
     var xRefFin = xPos(SORTING_DIA_REFRIGERIO_FIN_MIN);
-    ctx.fillStyle = "rgba(242,169,0,0.10)";
+    ctx.fillStyle = "rgba(242,169,0,0.28)";
     ctx.fillRect(xRefIni, padT, xRefFin - xRefIni, chartH);
 
     // Etiquetas de hora en el eje X
