@@ -306,6 +306,31 @@
   body:not(.es-fila-backus) .solo-fila-backus{display:none !important;}
   body.es-fila-backus .solo-sup-backus{display:none !important;}
   body.backus-noche .panel-editor-horas-clasico{display:none !important;}
+
+  /* ---------- CLASIFICACION SORTING ---------- */
+  .clasif-bloque{border:1px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden;}
+  .clasif-bloque-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px;cursor:pointer;background:var(--panel-2);}
+  .clasif-bloque-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14.5px;color:var(--text);letter-spacing:.2px;}
+  .clasif-bloque-resumen{font-size:10.5px;color:var(--text-soft);font-family:'Roboto Mono',monospace;text-align:right;line-height:1.5;flex:none;}
+  .clasif-bloque-head .chev{flex:none;}
+  .clasif-bloque-body{display:none;padding:14px 12px;background:var(--panel);border-top:1px solid var(--border);}
+  .clasif-bloque-body.open{display:block;}
+  .clasif-contador{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;}
+  .clasif-contador:last-child{margin-bottom:0;}
+  .clasif-contador-label{font-size:12px;font-weight:700;flex:1;min-width:0;}
+  .clasif-contador-label.rojo{color:var(--rojo);}
+  .clasif-contador-label.amarillo{color:var(--amber);}
+  .clasif-contador-label.verde{color:var(--verde);}
+  .clasif-contador-label.blanco{color:var(--text);}
+  .clasif-contador-controles{display:flex;align-items:center;gap:8px;flex:none;}
+  .clasif-btn-48{width:48px;height:48px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;}
+  .clasif-btn-48:active{background:var(--panel);}
+  .clasif-contador-valor{width:30px;text-align:center;font-family:'Roboto Mono',monospace;font-weight:700;font-size:15px;flex:none;}
+  .clasif-lista-item{display:flex;align-items:flex-start;gap:10px;padding:11px 4px;border-bottom:1px solid var(--border);}
+  .clasif-lista-item:last-child{border-bottom:none;}
+  .clasif-lista-info{flex:1;min-width:0;}
+  .clasif-lista-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--text);}
+  .clasif-lista-estado{font-size:11.5px;font-weight:600;margin-top:2px;}
   .msg-panel{display:none;}
   .msg-panel.open{display:block;}
   .obs-row{margin-bottom:8px;}
@@ -408,6 +433,7 @@
     <div class="topbar-actions">
       <span class="sync-badge"><span class="sync-dot" id="sync-dot-app"></span><span id="sync-txt-app">conectando&hellip;</span></span>
       <button class="icon-btn solo-backus solo-sup-backus" id="btn-reset" title="Reiniciar el turno actual (nuevo reporte)">&#8635;</button>
+      <button class="icon-btn solo-sorting" id="btn-reset-sorting" title="Reiniciar Clasificaci&oacute;n Sorting (no borra Head Count)">&#8635;</button>
       <button class="icon-btn" id="btn-logout" title="Salir">&#9211;</button>
     </div>
   </div>
@@ -539,7 +565,7 @@
 
     <section class="panel solo-sorting">
       <div class="panel-title small">Bloques</div>
-      <div id="sorting-dia-chart-titulo" style="display:none;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--amber);letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;">Seguimiento de Tiempo en Sorting</div>
+      <div id="sorting-dia-chart-titulo" style="display:none;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--amber);letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;">Seguimiento de Tiempo en Sorting<span id="sorting-dia-tiempo-total" style="display:block;font-family:'Roboto Mono',monospace;font-weight:500;font-size:10.5px;color:var(--text-soft);text-transform:none;letter-spacing:0;margin-top:3px;"></span></div>
       <div class="chart-wrap" id="sorting-dia-chart-wrap" style="height:190px;display:none;">
         <canvas id="grafico-sorting-dia"></canvas>
       </div>
@@ -561,6 +587,16 @@
         <input type="checkbox" id="sorting-apoyo-validacion">
         <span>Apoyo con Validaci&oacute;n</span>
       </label>
+    </section>
+
+    <section class="panel solo-sorting">
+      <div class="collapsible-head" data-target="clasif-body">
+        <div class="panel-title small" style="margin:0;">Clasificaci&oacute;n Sorting<span class="chev" id="chev-clasif">&#9662;</span></div>
+      </div>
+      <div class="collapsible-body" id="clasif-body">
+        <div id="clasif-lista"></div>
+        <button class="btn btn-amber" id="btn-clasif-wsap" type="button" style="margin-top:4px;">Enviar Status por WSAP</button>
+      </div>
     </section>
 
     <section class="panel solo-sorting" id="panel-estatus-bloques-clasico">
@@ -719,11 +755,6 @@
   // considera "entregado" SOLO al tocar Compartir por WhatsApp (el check
   // ya no existe en este modo). De 11:00 a 11:59 es Refrigerio: no cuenta
   // como atraso ni suena alarma en esa ventana.
-  var SORTING_DIA_BLOQUES = [
-    { id:"b930", label:"9:30 am", h:9, m:30 },
-    { id:"b100", label:"1:00 pm", h:13, m:0 },
-    { id:"b330", label:"3:30 pm", h:15, m:30 }
-  ];
   var SORTING_DIA_REFRIGERIO_INICIO_MIN = 11*60;
   var SORTING_DIA_REFRIGERIO_FIN_MIN = 12*60;
   function esTurnoDia(){ return estado.turno === "Turno 1 - Ma\u00f1ana"; }
@@ -731,13 +762,47 @@
     var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
     return ahoraMin >= SORTING_DIA_REFRIGERIO_INICIO_MIN && ahoraMin < SORTING_DIA_REFRIGERIO_FIN_MIN;
   }
-  function normalizarDiaBloques(datos){
+  /* ============== CLASIFICACION SORTING (reemplaza el sistema de 3 horas fijas) ==============
+     5 bloques con 4 contadores cada uno (R=x Clasificar, A=Mixeado,
+     V=Completas, B=Vacias). Maximo 66 PH por bloque (R+A+V+B<=66). La
+     "Hora Entrega" de cada bloque se recalcula cada vez que se toca un
+     contador de ese bloque: Hora Actual (en ese instante) + Tiempo
+     Bloque/Total Personal. Tiempo Bloque = (R+A)*2.27 minutos. */
+  var CLASIF_BLOQUES = [
+    { id:"b5", nombre:"BLOQUE 5" },
+    { id:"b4", nombre:"BLOQUE 4" },
+    { id:"b3", nombre:"BLOQUE 3" },
+    { id:"b2", nombre:"BLOQUE 2" },
+    { id:"f4", nombre:"FILA 4" }
+  ];
+  var CLASIF_MAX_PH = 66;
+  var CLASIF_FACTOR_MIN = 2.27;
+  function nombreClasifBloque(id){
+    var b = CLASIF_BLOQUES.filter(function(x){ return x.id === id; })[0];
+    return b ? b.nombre : id;
+  }
+  function normalizarClasificacion(datos){
     var base = {};
-    SORTING_DIA_BLOQUES.forEach(function(b){ base[b.id] = { entregado:false, horaEnvio:"" }; });
+    CLASIF_BLOQUES.forEach(function(b){
+      base[b.id] = { r:0, a:0, v:0, b:0, horaEntrega:null, entregado:false, horaEnvio:"" };
+    });
     if(datos && typeof datos === "object"){
-      Object.keys(datos).forEach(function(k){ if(base[k]) base[k] = Object.assign({}, base[k], datos[k]); });
+      Object.keys(datos).forEach(function(k){
+        if(base[k]) base[k] = Object.assign({}, base[k], datos[k]);
+      });
     }
     return base;
+  }
+  function tiempoBloqueMin(c){ return (((c.r||0) + (c.a||0)) * CLASIF_FACTOR_MIN); }
+  function totalPHBloque(c){ return (c.r||0) + (c.a||0) + (c.v||0) + (c.b||0); }
+  function totalPersonalSorting(reg){ return (reg.personalFijo||0) + (reg.personalRefuerzo||0); }
+  function formatearHoraDesdeMinutos(min){
+    if(min === null || min === undefined || isNaN(min)) return "-";
+    var m = ((Math.round(min) % 1440) + 1440) % 1440;
+    var h = Math.floor(m/60), mm = m % 60;
+    var periodo = h < 12 ? "am" : "pm";
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ":" + String(mm).padStart(2,"0") + " " + periodo;
   }
 
   /* ============== SORTING / TURNO DIA: GRAFICO VERDE ABAJO / ROJO ARRIBA ==============
@@ -762,7 +827,7 @@
   // fuerza el valor a 0 (verde), sin importar si hay algo vencido sin
   // entregar.
   function valorDemoraBloque(referenciaMin, deadlineMin){
-    var v = 1 + (referenciaMin - deadlineMin) / 60;
+    var v = 1.5 + (referenciaMin - deadlineMin) / 60; // 1.50 = frontera exacta (mitad del grafico)
     return Math.max(0, Math.min(3, v));
   }
   function forzarRefrigerio(minuto, valor){
@@ -778,10 +843,12 @@
   //   en ese instante, y despues la linea vuelve a la base (verde).
   function construirPuntosLineaSorting(bloques, finDibujo){
     var puntos = [{ x: SORTING_DIA_EJE_INICIO_MIN, y: 0 }];
-    SORTING_DIA_BLOQUES.forEach(function(b){
-      var deadline = b.h*60 + b.m;
-      if(deadline > finDibujo) return; // aun no le toca a este bloque
+    CLASIF_BLOQUES.forEach(function(b){
       var eb = bloques[b.id];
+      if(!eb || eb.horaEntrega === null || eb.horaEntrega === undefined) return; // bloque sin actividad: no tiene hora de entrega calculada
+      var deadline = eb.horaEntrega;
+      b = { id: b.id, label: b.nombre };
+      if(deadline > finDibujo) return; // aun no le toca a este bloque
       var entregadoMin = (eb && eb.entregado) ? parsearHoraAMin(eb.horaEnvio) : null;
 
       if(entregadoMin !== null){
@@ -1105,9 +1172,9 @@
   function suscribirSortingDiaParaBackus(){
     var claveF = fk(fechaLiveStr());
     if(refSortingDiaParaBackus) refSortingDiaParaBackus.off();
-    refSortingDiaParaBackus = db.ref("sorting/" + claveF + "/t1/diaBloques");
+    refSortingDiaParaBackus = db.ref("sorting/" + claveF + "/t1/clasificacion");
     refSortingDiaParaBackus.on("value", function(snap){
-      cacheSortingDiaParaBackus = normalizarDiaBloques(snap.val());
+      cacheSortingDiaParaBackus = normalizarClasificacion(snap.val());
       if(rolActual === "backus" && !document.body.classList.contains("es-fila-backus")){ renderLineaTiempoBackus(); }
     });
   }
@@ -1115,26 +1182,28 @@
     var cont = document.getElementById("backus-linea-sorting");
     var tag = document.getElementById("backus-linea-sorting-tag");
     if(!cont) return;
-    var bloques = cacheSortingDiaParaBackus || normalizarDiaBloques(null);
+    var bloques = cacheSortingDiaParaBackus || normalizarClasificacion(null);
     var enRefrigerio = enRefrigerioSortingDia();
     var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
     var entregados = 0;
     cont.innerHTML = "";
-    SORTING_DIA_BLOQUES.forEach(function(b){
+    CLASIF_BLOQUES.forEach(function(b){
       var eb = bloques[b.id];
       if(eb.entregado) entregados++;
-      var vencido = !eb.entregado && !enRefrigerio && ahoraMin >= (b.h*60+b.m);
+      var tieneEntrega = eb.horaEntrega !== null && eb.horaEntrega !== undefined;
+      var vencido = !eb.entregado && !enRefrigerio && tieneEntrega && ahoraMin > eb.horaEntrega;
       var color = eb.entregado ? "var(--verde)" : (vencido ? "var(--rojo)" : "var(--text-soft)");
       var estadoTxt = eb.entregado ? ("Entregado " + (eb.horaEnvio||"")) : (enRefrigerio ? "Refrigerio" : (vencido ? "Atrasado" : "En Proceso"));
+      var entregaTxt = tieneEntrega ? (" \u00b7 Entrega " + formatearHoraDesdeMinutos(eb.horaEntrega)) : "";
       var item = document.createElement("div");
       item.className = "hist-item";
       item.innerHTML =
-        '<span class="hist-fecha">' + escapeAttr(b.label) + '</span>' +
-        '<span class="hist-info">' + escapeAttr(estadoTxt) + '</span>' +
+        '<span class="hist-fecha">' + escapeAttr(b.nombre) + '</span>' +
+        '<span class="hist-info">' + escapeAttr(estadoTxt + entregaTxt) + '</span>' +
         '<span class="hist-pct" style="color:' + color + ';">&#9679;</span>';
       cont.appendChild(item);
     });
-    if(tag) tag.textContent = entregados + "/" + SORTING_DIA_BLOQUES.length;
+    if(tag) tag.textContent = entregados + "/" + CLASIF_BLOQUES.length;
   }
 
   /* ============== SUSCRIPCION A /historico (en vivo, solo se muestra a Backus) ============== */
@@ -1191,13 +1260,13 @@
     if(!estado.turno) return null;
     var turnoId = TURNO_ID[estado.turno];
     var r = cacheSorting[turnoId];
-    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"", diaBloques: normalizarDiaBloques(null) };
+    if(!r) return { personalFijo:12, personalRefuerzo:0, apoyoValidacion:false, seleccion:"", clasificacion: normalizarClasificacion(null) };
     return {
       personalFijo: (r.personalFijo!==undefined? r.personalFijo:12),
       personalRefuerzo: (r.personalRefuerzo!==undefined? r.personalRefuerzo:0),
       apoyoValidacion: !!r.apoyoValidacion,
       seleccion: (r.seleccion!==undefined && r.seleccion!==null) ? r.seleccion : "",
-      diaBloques: normalizarDiaBloques(r.diaBloques)
+      clasificacion: normalizarClasificacion(r.clasificacion)
     };
   }
 
@@ -2380,9 +2449,9 @@
     if(!reg){ detenerAlarmaSortingDia(); return; }
     if(enRefrigerioSortingDia()){ detenerAlarmaSortingDia(); return; }
     var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
-    var hayVencido = SORTING_DIA_BLOQUES.some(function(b){
-      var eb = reg.diaBloques[b.id];
-      return !eb.entregado && ahoraMin >= (b.h*60+b.m);
+    var hayVencido = CLASIF_BLOQUES.some(function(b){
+      var eb = reg.clasificacion[b.id];
+      return !eb.entregado && eb.horaEntrega !== null && eb.horaEntrega !== undefined && ahoraMin > eb.horaEntrega;
     });
     if(hayVencido) dispararAlarmaSortingDia(); else detenerAlarmaSortingDia();
   }
@@ -2470,12 +2539,13 @@
     });
   }
 
-  /* ============== SORTING / TURNO DIA: 3 BLOQUES CON HORA FIJA ==============
-     Sistema independiente del de Tarde/Noche (no comparte ningun campo:
-     usa "diaBloques", el otro usa "seleccion"). Un bloque solo se marca
-     como entregado al tocar "Compartir por WhatsApp"; el check no existe
-     en este modo. De 11:00 a 11:59 es Refrigerio: no cuenta como atraso
-     ni dispara la alarma. */
+  /* ============== SORTING / TURNO DIA: LISTA DE BLOQUES (de Clasificacion Sorting) ==============
+     Muestra los 5 bloques del apartado Clasificacion Sorting con su Hora
+     de Entrega calculada (hora actual al tocar un contador + Tiempo
+     Bloque / Total Personal). Si la hora actual supera la Hora de Entrega
+     y no esta entregado = Atrasado (rojo); si no, En Proceso. Un bloque
+     solo queda Entregado (verde) al tocar Compartir. De 11:00 a 11:59 es
+     Refrigerio: no cuenta como atraso ni dispara la alarma. */
   function renderBloquesDia(){
     var reg = registroSortingActual();
     var cont = document.getElementById("bloques-lista");
@@ -2483,18 +2553,19 @@
     var enRefrigerio = enRefrigerioSortingDia();
     var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
     cont.innerHTML = "";
-    SORTING_DIA_BLOQUES.forEach(function(b){
-      var eb = reg.diaBloques[b.id];
-      var deadlineMin = b.h*60 + b.m;
-      var vencido = !eb.entregado && !enRefrigerio && ahoraMin >= deadlineMin;
+    CLASIF_BLOQUES.forEach(function(b){
+      var eb = reg.clasificacion[b.id];
+      var tieneEntrega = eb.horaEntrega !== null && eb.horaEntrega !== undefined;
+      var vencido = !eb.entregado && !enRefrigerio && tieneEntrega && ahoraMin > eb.horaEntrega;
       var color = eb.entregado ? "var(--verde)" : (vencido ? "var(--rojo)" : "var(--text-soft)");
-      var estadoTxt = eb.entregado ? ("Entregado " + (eb.horaEnvio||"")) : (enRefrigerio ? "Refrigerio" : (vencido ? "Atrasado" : "En Proceso"));
+      var estadoTxt = eb.entregado ? "Entregado" : (enRefrigerio ? "Refrigerio" : (vencido ? "Atrasado" : "En Proceso"));
+      var entregaTxt = tieneEntrega ? formatearHoraDesdeMinutos(eb.horaEntrega) : "-";
       var fila = document.createElement("div");
-      fila.className = "bloque-item";
+      fila.className = "clasif-lista-item";
       fila.innerHTML =
-        '<div style="flex:1;min-width:0;">' +
-          '<div class="bloque-nombre">' + escapeAttr(b.label) + '</div>' +
-          '<small style="color:' + color + ';font-weight:600;">' + escapeAttr(estadoTxt) + '</small>' +
+        '<div class="clasif-lista-info">' +
+          '<div class="clasif-lista-nombre">' + escapeAttr(b.nombre) + '</div>' +
+          '<div class="clasif-lista-estado" style="color:' + color + ';">Entrega: ' + escapeAttr(entregaTxt) + ' | ' + escapeAttr(estadoTxt) + '</div>' +
         '</div>' +
         '<button class="btn btn-amber" style="width:auto;padding:9px 14px;flex:none;" data-id="' + b.id + '" type="button">Compartir</button>';
       cont.appendChild(fila);
@@ -2502,18 +2573,20 @@
     cont.querySelectorAll("button[data-id]").forEach(function(btn){
       btn.addEventListener("click", function(){
         var id = this.dataset.id;
-        var b = SORTING_DIA_BLOQUES.filter(function(x){ return x.id === id; })[0];
         var horaEnvio = horaLiveStr();
-        db.ref(rutaSorting("diaBloques/"+id+"/entregado")).set(true);
-        db.ref(rutaSorting("diaBloques/"+id+"/horaEnvio")).set(horaEnvio);
-        var msg = "REPORTE DE BLOQUE - SORTING\n" +
-          "Bloque: " + (b ? b.label : id) + "\n" +
+        var regAhora = registroSortingActual();
+        var c = regAhora.clasificacion[id];
+        db.ref(rutaSorting("clasificacion/"+id+"/entregado")).set(true);
+        db.ref(rutaSorting("clasificacion/"+id+"/horaEnvio")).set(horaEnvio);
+        var msg = "*" + nombreClasifBloque(id) + " - ENTREGADO*\n" +
           "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
           "Encargado: " + (estado.nombreSorting || "-") + "\n" +
           "Fecha: " + fechaLiveStr() + "\n" +
-          "Hora de Env\u00edo: " + horaEnvio;
+          "Hora de Env\u00edo: " + horaEnvio + "\n" +
+          "Entrega estimada: " + formatearHoraDesdeMinutos(c.horaEntrega) + "\n" +
+          "PH x clasificar: " + (c.r||0) + " | Mixeado: " + (c.a||0) + " | Completas: " + (c.v||0) + " | Vac\u00edas: " + (c.b||0);
         enviarPorWhatsapp(msg);
-        toast((b ? b.label : id) + " marcado como entregado.");
+        toast(nombreClasifBloque(id) + " marcado como entregado.");
       });
     });
 
@@ -2527,15 +2600,19 @@
     if(elEstadoFila){
       elEstadoFila.style.display = "flex";
       var estadoAhora = 0;
-      SORTING_DIA_BLOQUES.forEach(function(b){
-        var deadline = b.h*60+b.m;
-        if(deadline > ahoraMin) return;
-        var eb = reg.diaBloques[b.id];
-        if(eb && eb.entregado) return;
-        estadoAhora = Math.max(estadoAhora, forzarRefrigerio(ahoraMin, valorDemoraBloque(ahoraMin, deadline)));
+      CLASIF_BLOQUES.forEach(function(b){
+        var eb = reg.clasificacion[b.id];
+        if(!eb || eb.entregado || eb.horaEntrega === null || eb.horaEntrega === undefined) return;
+        if(eb.horaEntrega > ahoraMin) return;
+        estadoAhora = Math.max(estadoAhora, forzarRefrigerio(ahoraMin, valorDemoraBloque(ahoraMin, eb.horaEntrega)));
       });
-      if(dot) dot.style.background = enRefrigerio ? "var(--amber)" : (estadoAhora >= 1 ? "var(--rojo)" : "var(--verde)");
+      if(dot) dot.style.background = enRefrigerio ? "var(--amber)" : (estadoAhora > 1.5 ? "var(--rojo)" : "var(--verde)");
       if(txt) txt.textContent = enRefrigerio ? "Refrigerio" : "En Proceso";
+    }
+    var elTT = document.getElementById("sorting-dia-tiempo-total");
+    if(elTT){
+      var ttot = tiempoTotalClasifMin(reg);
+      elTT.textContent = "Tiempo total: " + (ttot.minutos/60).toFixed(2) + " h  \u00b7  Total Personal: " + totalPersonalSorting(reg);
     }
     dibujarGraficoSortingDia();
   }
@@ -2551,7 +2628,7 @@
     var wrap = canvas.parentElement;
     var reg = registroSortingActual();
     if(!reg || !wrap) return;
-    var bloques = reg.diaBloques;
+    var bloques = reg.clasificacion;
 
     var dpr = window.devicePixelRatio || 1;
     var cssW = wrap.clientWidth || 300;
@@ -2577,7 +2654,7 @@
 
     // FONDO DIVIDIDO EN 2 (fijo, no depende de datos reales): abajo VERDE
     // (0 a 1.00, a tiempo), arriba ROJO (1.00 a 3.00, tarde).
-    var yFrontera = yPos(1);
+    var yFrontera = yPos(1.5); // mitad exacta: arriba rojo, abajo verde
     ctx.fillStyle = "#C00000";
     ctx.fillRect(padL, padT, chartW, yFrontera - padT);
     ctx.fillStyle = "#00B050";
@@ -2744,12 +2821,179 @@
     enviarPorWhatsapp(generarMensajeSorting());
   });
 
+  /* ============== CLASIFICACION SORTING: PANEL COLAPSABLE (todos los turnos de Sorting) ==============
+     Cada bloque guarda r/a/v/b + horaEntrega (minutos del dia) en
+     sorting/{fecha}/{turno}/clasificacion/{id}. Cada toque a un contador
+     escribe SOLO los campos de ese bloque (nunca el nodo completo). */
+  var clasifAbiertos = {}; // estado visual (bloques expandidos), solo local
+  var CLASIF_CAMPOS = [
+    { k:"r", label:"PH's x Clasificar", cls:"rojo" },
+    { k:"a", label:"PH's Mixeado", cls:"amarillo" },
+    { k:"v", label:"PH's Completas", cls:"verde" },
+    { k:"b", label:"PH's Vac\u00edas", cls:"blanco" }
+  ];
+  function redondear1(n){ return Math.round(n*10)/10; }
+  function minutosAhoraExactos(){
+    var d = new Date();
+    return d.getHours()*60 + d.getMinutes() + d.getSeconds()/60;
+  }
+  // Hora Entrega = Hora Actual (reloj en vivo) + Tiempo Bloque / Total Personal
+  function calcularHoraEntrega(c, totalPersonal){
+    var personal = totalPersonal > 0 ? totalPersonal : 1;
+    return Math.round((minutosAhoraExactos() + tiempoBloqueMin(c) / personal) * 100) / 100;
+  }
+  function estadoTextoBloque(eb, ahoraMin, enRefrigerio){
+    var tiene = eb.horaEntrega !== null && eb.horaEntrega !== undefined;
+    if(eb.entregado) return "Entregado";
+    if(enRefrigerio) return "Refrigerio";
+    if(tiene && ahoraMin > eb.horaEntrega) return "Atrasado";
+    return "En Proceso";
+  }
+
+  function cambiarContadorClasif(id, campo, delta){
+    var turnoId = TURNO_ID[estado.turno];
+    if(!turnoId) return;
+    if(!cacheSorting[turnoId]) cacheSorting[turnoId] = {};
+    var regLocal = registroSortingActual();
+    var c = Object.assign({}, regLocal.clasificacion[id]);
+    var nuevo = (c[campo]||0) + delta;
+    if(nuevo < 0) return;
+    if(delta > 0 && totalPHBloque(c) + delta > CLASIF_MAX_PH){
+      toast("M\u00e1ximo " + CLASIF_MAX_PH + " PH por bloque.");
+      return;
+    }
+    c[campo] = nuevo;
+    c.horaEntrega = calcularHoraEntrega(c, totalPersonalSorting(regLocal));
+    // actualizacion local inmediata (para toques rapidos seguidos)
+    var cl = cacheSorting[turnoId].clasificacion;
+    if(!cl || typeof cl !== "object") cl = cacheSorting[turnoId].clasificacion = {};
+    cl[id] = Object.assign({}, cl[id] || {}, { r:c.r, a:c.a, v:c.v, b:c.b, horaEntrega:c.horaEntrega });
+    var upd = {}; upd[campo] = nuevo; upd.horaEntrega = c.horaEntrega;
+    db.ref(rutaSorting("clasificacion/"+id)).update(upd);
+    refrescarSortingClasif();
+  }
+
+  function refrescarSortingClasif(){
+    renderClasificacionSorting();
+    if(esTurnoDia()) renderBloquesDia();
+    verificarAlarmaSortingDia();
+  }
+
+  function renderClasificacionSorting(){
+    var cont = document.getElementById("clasif-lista");
+    if(!cont) return;
+    var reg = registroSortingActual();
+    if(!reg) return;
+    cont.innerHTML = "";
+    CLASIF_BLOQUES.forEach(function(b){
+      var c = reg.clasificacion[b.id];
+      var total = totalPHBloque(c);
+      var tiempo = redondear1(tiempoBloqueMin(c));
+      var abierto = !!clasifAbiertos[b.id];
+      var wrap = document.createElement("div");
+      wrap.className = "clasif-bloque";
+      var html =
+        '<div class="clasif-bloque-head" data-id="' + b.id + '">' +
+          '<span class="clasif-bloque-nombre">' + escapeAttr(b.nombre) + '</span>' +
+          '<span class="clasif-bloque-resumen">Total: ' + total + '/' + CLASIF_MAX_PH + '<br>Tiempo: ' + tiempo + ' min</span>' +
+          '<span class="chev' + (abierto ? ' open' : '') + '">&#9662;</span>' +
+        '</div>' +
+        '<div class="clasif-bloque-body' + (abierto ? ' open' : '') + '">';
+      CLASIF_CAMPOS.forEach(function(f){
+        html +=
+          '<div class="clasif-contador">' +
+            '<span class="clasif-contador-label ' + f.cls + '">' + escapeAttr(f.label) + '</span>' +
+            '<div class="clasif-contador-controles">' +
+              '<button type="button" class="clasif-btn-48" data-id="' + b.id + '" data-campo="' + f.k + '" data-delta="-1">&minus;</button>' +
+              '<span class="clasif-contador-valor">' + (c[f.k]||0) + '</span>' +
+              '<button type="button" class="clasif-btn-48" data-id="' + b.id + '" data-campo="' + f.k + '" data-delta="1">+</button>' +
+            '</div>' +
+          '</div>';
+      });
+      html +=
+          '<div class="sorting-total-personal" style="margin-top:12px;">Total: ' + total + '/' + CLASIF_MAX_PH + ' &middot; Tiempo: ' + tiempo + ' min</div>' +
+        '</div>';
+      wrap.innerHTML = html;
+      cont.appendChild(wrap);
+    });
+    cont.querySelectorAll(".clasif-bloque-head").forEach(function(head){
+      head.addEventListener("click", function(){
+        var id = this.dataset.id;
+        clasifAbiertos[id] = !clasifAbiertos[id];
+        var body = this.nextElementSibling;
+        var chev = this.querySelector(".chev");
+        if(body) body.classList.toggle("open", !!clasifAbiertos[id]);
+        if(chev) chev.classList.toggle("open", !!clasifAbiertos[id]);
+      });
+    });
+    cont.querySelectorAll(".clasif-btn-48").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        cambiarContadorClasif(this.dataset.id, this.dataset.campo, Number(this.dataset.delta));
+      });
+    });
+  }
+
+  function tiempoTotalClasifMin(reg){
+    var sumaRA = 0;
+    CLASIF_BLOQUES.forEach(function(b){ var c = reg.clasificacion[b.id]; sumaRA += (c.r||0) + (c.a||0); });
+    var personal = totalPersonalSorting(reg);
+    if(personal <= 0) personal = 1;
+    return { sumaRA: sumaRA, minutos: (sumaRA * CLASIF_FACTOR_MIN) / personal };
+  }
+
+  /* ---- Mensaje de WhatsApp: ENVIAR STATUS POR WSAP ---- */
+  function generarMensajeClasificacion(){
+    var reg = registroSortingActual();
+    if(!reg) return "";
+    var d = new Date();
+    var hhmm = String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+    var ahoraMin = d.getHours()*60 + d.getMinutes();
+    var enRef = enRefrigerioSortingDia();
+    var tot = tiempoTotalClasifMin(reg);
+    var lineas = [];
+    lineas.push("*CLASIFICACI\u00d3N SORTING*");
+    lineas.push("FCH REGISTRO: " + fechaLiveStr() + " " + hhmm);
+    lineas.push("HORA ENV\u00cdO: " + hhmm);
+    lineas.push("Total Personal: " + totalPersonalSorting(reg));
+    CLASIF_BLOQUES.forEach(function(b){
+      var c = reg.clasificacion[b.id];
+      lineas.push("*" + b.nombre + ":* " + ((c.r||0)+(c.a||0)) + " PH x clasificar (R:" + (c.r||0) + " A:" + (c.a||0) + ") | V:" + (c.v||0) + " B:" + (c.b||0));
+      lineas.push("> Tiempo: " + redondear1(tiempoBloqueMin(c)) + " min");
+      lineas.push("> Entrega: " + formatearHoraDesdeMinutos(c.horaEntrega) + " | " + estadoTextoBloque(c, ahoraMin, enRef));
+    });
+    lineas.push("*TOTAL POR CLASIFICAR:* " + tot.sumaRA + " PH");
+    lineas.push("*TIEMPO TOTAL:* " + redondear1(tot.minutos) + " min");
+    return lineas.join("\n");
+  }
+  document.getElementById("btn-clasif-wsap").addEventListener("click", function(){
+    enviarPorWhatsapp(generarMensajeClasificacion());
+  });
+
+  /* ---- RESET (Sorting): borra solo Clasificacion Sorting, no Head Count ni reloj ---- */
+  document.getElementById("btn-reset-sorting").addEventListener("click", function(){
+    if(!estado.turno) return;
+    var ok = confirm(
+      "Esto va a reiniciar SOLO Clasificaci\u00f3n Sorting (" + nombreCortoTurno(estado.turno) + "):\n\n" +
+      "- Contadores de todos los bloques\n" +
+      "- Horas de entrega y estados (Entregado/Atrasado)\n\n" +
+      "El Head Count NO se borra.\n\n\u00bfSeguro que quieres continuar?"
+    );
+    if(!ok) return;
+    var turnoId = TURNO_ID[estado.turno];
+    if(cacheSorting[turnoId]) delete cacheSorting[turnoId].clasificacion;
+    db.ref(rutaSorting("clasificacion")).remove();
+    detenerAlarmaSortingDia();
+    refrescarSortingClasif();
+    toast("Clasificaci\u00f3n Sorting reiniciada. Head Count intacto.");
+  });
+
   function renderSorting(){
     var reg = registroSortingActual();
     if(!reg) return;
     actualizarRelojSorting();
     renderBloques();
     bindFuerzaLaboral();
+    renderClasificacionSorting();
     var panelClasico = document.getElementById("panel-estatus-bloques-clasico");
     if(panelClasico) panelClasico.style.display = esTurnoDia() ? "none" : "block";
     if(!esTurnoDia()) actualizarMensajeSorting();
