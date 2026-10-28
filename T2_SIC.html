@@ -414,10 +414,6 @@
           <label for="in-nombre-login">Ingresa tus Nombres Completos</label>
           <input id="in-nombre-login" type="text" placeholder="Nombre y Apellido" autocomplete="off">
         </div>
-        <div class="campo" id="campo-pass-login" style="display:none;">
-          <label for="in-pass-login">Contrase&ntilde;a</label>
-          <input id="in-pass-login" type="password" placeholder="Contrase&ntilde;a" autocomplete="off">
-        </div>
         <button class="subform-btn backus" id="btn-login-confirmar" type="button">Ingresar</button>
         <div class="login-error" id="login-error-generico"></div>
       </div>
@@ -447,11 +443,6 @@
       </div>
       <div class="sorting-reloj" id="backus-reloj" style="margin-bottom:12px;">--/--/---- &middot; --:--:--</div>
       <div class="grid2">
-        <div class="campo-mini"><label>Subarea</label><input id="c-subarea"></div>
-        <div class="campo-mini"><label>Fecha</label><input id="c-fecha" placeholder="dd/mm/aaaa"></div>
-        <div class="campo-mini"><label>Area</label><input id="c-area"></div>
-        <div class="campo-mini"><label>Plan de Acci&oacute;n</label><input id="c-plan-accion" class="plan-accion-display" readonly value="-" title="Toca para silenciar la alarma"></div>
-        <div class="campo-mini full"><label>Monitoreo</label><input id="c-monitoreo"></div>
         <div class="campo-mini full"><label>Total PH del d&iacute;a</label><input id="c-total-ph" inputmode="numeric" value="0"></div>
       </div>
 
@@ -690,6 +681,7 @@
 <!-- ================= FIREBASE ================= -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script>
   /* =====================================================================
      PEGA AQUI TU CONFIGURACION DE FIREBASE
@@ -712,6 +704,34 @@
 <script>
 (function(){
   "use strict";
+
+  /* ============== HORA REAL (no depende del celular) ==============
+     Se toma la hora del servidor de Firebase (.info/serverTimeOffset) y se
+     muestra siempre en horario de Lima, sin importar la hora ni la zona
+     horaria configuradas en el dispositivo. fechaReal() devuelve un Date
+     cuyos getHours()/getDate()/etc. ya entregan la hora de Lima. */
+  var offsetServidorMs = 0;
+  var ZONA_RELOJ = "America/Lima";
+  var fmtRelojLima = null;
+  try{
+    fmtRelojLima = new Intl.DateTimeFormat("en-GB", {
+      timeZone: ZONA_RELOJ, hour12: false,
+      year:"numeric", month:"2-digit", day:"2-digit",
+      hour:"2-digit", minute:"2-digit", second:"2-digit"
+    });
+  }catch(e){ fmtRelojLima = null; }
+  function fechaReal(){
+    var t = new Date(Date.now() + offsetServidorMs);
+    if(!fmtRelojLima) return t;
+    try{
+      var p = {};
+      fmtRelojLima.formatToParts(t).forEach(function(x){ p[x.type] = x.value; });
+      return new Date(Number(p.year), Number(p.month)-1, Number(p.day), Number(p.hour)%24, Number(p.minute), Number(p.second));
+    }catch(e){ return t; }
+  }
+  firebase.database().ref(".info/serverTimeOffset").on("value", function(snap){
+    offsetServidorMs = Number(snap.val()) || 0;
+  });
 
   /* ============== SESION LOCAL (solo el rol con el que entraste en ESTE dispositivo) ============== */
   var SESSION_KEY = "t2sic_session";
@@ -759,7 +779,7 @@
   var SORTING_DIA_REFRIGERIO_FIN_MIN = 12*60;
   function esTurnoDia(){ return estado.turno === "Turno 1 - Ma\u00f1ana"; }
   function enRefrigerioSortingDia(){
-    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var ahoraMin = fechaReal().getHours()*60 + fechaReal().getMinutes();
     return ahoraMin >= SORTING_DIA_REFRIGERIO_INICIO_MIN && ahoraMin < SORTING_DIA_REFRIGERIO_FIN_MIN;
   }
   /* ============== CLASIFICACION SORTING (reemplaza el sistema de 3 horas fijas) ==============
@@ -898,7 +918,8 @@
     "Barriles en el s\u00f3tano",
     "Producto Terminado sin desencimar",
     "Generaci\u00f3n de Orden Interna x Producto sin stock/Frescura",
-    "Falta Disponibilidad de Camiones"
+    "Falta Disponibilidad de Camiones",
+    "Retraso Armado Lavoro"
   ];
   var OBS_FALTA_CAMIONES = "Falta Disponibilidad de Camiones";
 
@@ -974,7 +995,7 @@
   }
 
   function fechaHoyStr(){
-    var d = new Date();
+    var d = fechaReal();
     var dd = String(d.getDate()).padStart(2,"0");
     var mm = String(d.getMonth()+1).padStart(2,"0");
     var yy = d.getFullYear();
@@ -1139,14 +1160,14 @@
   // aplicativo, no el campo Fecha que edita ABInBev en la cabecera. Asi
   // Sorting queda totalmente independiente de ese apartado.
   function fechaLiveStr(){
-    var d = new Date();
+    var d = fechaReal();
     var dd = String(d.getDate()).padStart(2,"0");
     var mm = String(d.getMonth()+1).padStart(2,"0");
     var yy = d.getFullYear();
     return dd+"/"+mm+"/"+yy;
   }
   function horaLiveStr(){
-    var d = new Date();
+    var d = fechaReal();
     var hh = String(d.getHours()).padStart(2,"0");
     var mi = String(d.getMinutes()).padStart(2,"0");
     var ss = String(d.getSeconds()).padStart(2,"0");
@@ -1184,7 +1205,7 @@
     if(!cont) return;
     var bloques = cacheSortingDiaParaBackus || normalizarClasificacion(null);
     var enRefrigerio = enRefrigerioSortingDia();
-    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var ahoraMin = fechaReal().getHours()*60 + fechaReal().getMinutes();
     var entregados = 0;
     cont.innerHTML = "";
     CLASIF_BLOQUES.forEach(function(b){
@@ -1373,13 +1394,11 @@
   var guardarPlan = debounce(function(i, v){ db.ref("comun/planes/"+i+"/accion").set(v); }, 400);
 
   /* ============== PANTALLA INICIAL: MENU DE USUARIO / LOGIN ============== */
-  var CLAVE_ABINBEV = "@vpo2026";
   var rolSeleccionado = null;
 
   var elUserMenu = document.getElementById("user-menu");
   var elBtnUserMenu = document.getElementById("btn-user-menu");
   var elFormLogin = document.getElementById("form-login");
-  var elCampoPass = document.getElementById("campo-pass-login");
   var elFormLoginTitulo = document.getElementById("form-login-titulo");
 
   function cerrarMenuUsuario(){
@@ -1411,17 +1430,13 @@
     document.getElementById("login-error-generico").textContent = "";
     document.getElementById("in-turno-login").value = "";
     document.getElementById("in-nombre-login").value = "";
-    document.getElementById("in-pass-login").value = "";
     document.getElementById("in-fila-login").value = "";
     if(rol === "backus"){
       elFormLoginTitulo.textContent = "Ingresar \u00b7 ABInBev";
-      elCampoPass.style.display = "block";
     } else if(rol === "sorting"){
       elFormLoginTitulo.textContent = "Ingresar \u00b7 Sorting";
-      elCampoPass.style.display = "none";
     } else {
       elFormLoginTitulo.textContent = "Ingresar \u00b7 Externo";
-      elCampoPass.style.display = "none";
     }
     actualizarVisibilidadCampoFila();
     elFormLogin.classList.add("open");
@@ -1433,15 +1448,12 @@
   document.getElementById("btn-login-confirmar").addEventListener("click", function(){
     var err = document.getElementById("login-error-generico");
     try{
+      if(!appIniciada){ err.textContent = "Conectando de forma segura, intenta de nuevo en un momento."; return; }
       if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev, Externo o Sorting primero."; return; }
       var turno = document.getElementById("in-turno-login").value;
       var nombre = document.getElementById("in-nombre-login").value.trim();
       if(!turno){ err.textContent = "Selecciona tu turno."; return; }
       if(!nombre){ err.textContent = "Ingresa tus nombres completos."; return; }
-      if(rolSeleccionado === "backus"){
-        var pass = document.getElementById("in-pass-login").value;
-        if(pass !== CLAVE_ABINBEV){ err.textContent = "Contrase\u00f1a incorrecta."; return; }
-      }
       var filaElegida = "sup";
       if(rolSeleccionado === "backus" && turno === "Turno 3 - Nocturno"){
         filaElegida = document.getElementById("in-fila-login").value;
@@ -1508,7 +1520,6 @@
     document.getElementById("vista-login").style.display = "flex";
     document.getElementById("in-turno-login").value = "";
     document.getElementById("in-nombre-login").value = "";
-    document.getElementById("in-pass-login").value = "";
     document.getElementById("in-fila-login").value = "";
     document.getElementById("login-error-generico").textContent = "";
     elFormLogin.classList.remove("open");
@@ -1550,15 +1561,15 @@
     fijarSiNoEnfocado(document.getElementById("c-transportes"), reg ? reg.transportesProgramados : 0);
     document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
 
-    document.getElementById("c-subarea").oninput = function(){ estado.subarea = this.value; guardarComunSubarea(this.value); };
-    document.getElementById("c-fecha").oninput = function(){
+    (document.getElementById("c-subarea") || {}).oninput = function(){ estado.subarea = this.value; guardarComunSubarea(this.value); };
+    (document.getElementById("c-fecha") || {}).oninput = function(){
       estado.fecha = this.value;
       guardarComunFecha(this.value);
       asegurarRegistroExiste(estado.turno, this.value);
       horaSelIdx = 0;
     };
-    document.getElementById("c-area").oninput = function(){ estado.area = this.value; guardarComunArea(this.value); };
-    document.getElementById("c-monitoreo").oninput = function(){
+    (document.getElementById("c-area") || {}).oninput = function(){ estado.area = this.value; guardarComunArea(this.value); };
+    (document.getElementById("c-monitoreo") || {}).oninput = function(){
       estado.monitoreo = this.value; guardarComunMonitoreo(this.value);
       document.getElementById("titulo-grafico").childNodes[0].nodeValue = estado.monitoreo;
     };
@@ -1621,7 +1632,7 @@
     if(!hora){ toast("Selecciona una hora."); return; }
     if(!estado.turno){ return; }
     var nuevaRef = db.ref("ph_registros/" + clavePHRegistros()).push();
-    nuevaRef.set({ hora: hora, cantidad: cantidad, ts: Date.now(), encargado: estado.nombreLavoro || "" });
+    nuevaRef.set({ hora: hora, cantidad: cantidad, ts: Date.now() + offsetServidorMs, encargado: estado.nombreLavoro || "" });
     document.getElementById("cent-cantidad").value = 0;
     document.getElementById("cent-hora").value = "";
     toast("Registro guardado en Centralizado.");
@@ -2223,7 +2234,7 @@
     if(!h) return;
     var pct = meta > 0 ? (h.acumCargado||0)/meta : 0;
     var registro = {
-      ts: Date.now(),
+      ts: Date.now() + offsetServidorMs,
       fecha: estado.fecha, hora: esNoche ? "Acumulado" : h.hora, turno: estado.turno,
       supervisor: estado.nombreBackus || "", encargadoArmado: estado.nombreLavoro || "",
       subarea: estado.subarea, area: estado.area,
@@ -2291,7 +2302,7 @@
 
   function minutosDesdeInicioTurno(){
     if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var ahora = new Date();
+    var ahora = fechaReal();
     var actualMin = ahora.getHours()*60 + ahora.getMinutes();
     var inicioMin = TURNO_INICIO[estado.turno]*60;
     var diff = actualMin - inicioMin;
@@ -2448,7 +2459,7 @@
     var reg = registroSortingActual();
     if(!reg){ detenerAlarmaSortingDia(); return; }
     if(enRefrigerioSortingDia()){ detenerAlarmaSortingDia(); return; }
-    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var ahoraMin = fechaReal().getHours()*60 + fechaReal().getMinutes();
     var hayVencido = CLASIF_BLOQUES.some(function(b){
       var eb = reg.clasificacion[b.id];
       return !eb.entregado && eb.horaEntrega !== null && eb.horaEntrega !== undefined && ahoraMin > eb.horaEntrega;
@@ -2482,7 +2493,7 @@
     suscribirFechaSorting(); // el reloj es la fuente oficial de fecha para Sorting
     var el = document.getElementById("sorting-reloj");
     if(!el) return;
-    var d = new Date();
+    var d = fechaReal();
     var dd = String(d.getDate()).padStart(2,"0");
     var mm = String(d.getMonth()+1).padStart(2,"0");
     var yy = d.getFullYear();
@@ -2551,7 +2562,7 @@
     var cont = document.getElementById("bloques-lista");
     if(!reg || !cont) return;
     var enRefrigerio = enRefrigerioSortingDia();
-    var ahoraMin = new Date().getHours()*60 + new Date().getMinutes();
+    var ahoraMin = fechaReal().getHours()*60 + fechaReal().getMinutes();
     cont.innerHTML = "";
     CLASIF_BLOQUES.forEach(function(b){
       var eb = reg.clasificacion[b.id];
@@ -2685,7 +2696,7 @@
       ctx.fillText(label, x, padT + chartH + 8);
     });
 
-    var ahora = new Date();
+    var ahora = fechaReal();
     var ahoraMin = ahora.getHours()*60 + ahora.getMinutes();
     var finDibujo = Math.max(SORTING_DIA_EJE_INICIO_MIN, Math.min(ahoraMin, SORTING_DIA_EJE_FIN_MIN));
 
@@ -2834,7 +2845,7 @@
   ];
   function redondear1(n){ return Math.round(n*10)/10; }
   function minutosAhoraExactos(){
-    var d = new Date();
+    var d = fechaReal();
     return d.getHours()*60 + d.getMinutes() + d.getSeconds()/60;
   }
   // Hora Entrega = Hora Actual (reloj en vivo) + Tiempo Bloque / Total Personal
@@ -2945,7 +2956,7 @@
   function generarMensajeClasificacion(){
     var reg = registroSortingActual();
     if(!reg) return "";
-    var d = new Date();
+    var d = fechaReal();
     var hhmm = String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
     var ahoraMin = d.getHours()*60 + d.getMinutes();
     var enRef = enRefrigerioSortingDia();
@@ -3032,7 +3043,13 @@
   }
 
   /* ============== INICIO ============== */
-  window.addEventListener("DOMContentLoaded", function(){
+  /* Las reglas de Firebase ahora exigen sesion (auth != null). Por eso NADA
+     que lea/escriba datos arranca hasta que la autenticacion anonima este
+     lista: un listener creado antes de tiempo seria rechazado y cancelado. */
+  var appIniciada = false;
+  function iniciarApp(){
+    if(appIniciada) return;
+    appIniciada = true;
     restaurarInfoSesion();
     suscribirComun();
     suscribirHistorico();
@@ -3053,6 +3070,22 @@
     } else {
       actualizarDashboardInicio();
     }
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    function avisarErrorAuth(err){
+      console.error("Autenticacion anonima fallo:", err);
+      ["sync-dot-login","sync-dot-app"].forEach(function(id){ var d = document.getElementById(id); if(d) d.classList.add("off"); });
+      ["sync-txt-login","sync-txt-app"].forEach(function(id){ var t = document.getElementById(id); if(t) t.textContent = "sin acceso"; });
+      var e = document.getElementById("login-error-generico");
+      if(e) e.textContent = "No se pudo conectar de forma segura. Revisa que 'Anonymous' est\u00e9 habilitado en Firebase Authentication.";
+    }
+    try{
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){ iniciarApp(); }
+        else { firebase.auth().signInAnonymously().catch(avisarErrorAuth); }
+      });
+    }catch(err){ avisarErrorAuth(err); }
   });
 
 })();
