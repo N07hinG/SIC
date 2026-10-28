@@ -1448,7 +1448,11 @@
   document.getElementById("btn-login-confirmar").addEventListener("click", function(){
     var err = document.getElementById("login-error-generico");
     try{
-      if(!appIniciada){ err.textContent = "Conectando de forma segura, intenta de nuevo en un momento."; return; }
+      if(!appIniciada){
+        err.textContent = errorAuthTexto || "Conectando de forma segura, intenta de nuevo en un momento.";
+        if(errorAuthTexto && typeof reintentarAuth === "function") reintentarAuth();
+        return;
+      }
       if(!rolSeleccionado){ err.textContent = "Selecciona ABInBev, Externo o Sorting primero."; return; }
       var turno = document.getElementById("in-turno-login").value;
       var nombre = document.getElementById("in-nombre-login").value.trim();
@@ -3047,6 +3051,8 @@
      que lea/escriba datos arranca hasta que la autenticacion anonima este
      lista: un listener creado antes de tiempo seria rechazado y cancelado. */
   var appIniciada = false;
+  var errorAuthTexto = "";
+  var reintentarAuth = null;
   function iniciarApp(){
     if(appIniciada) return;
     appIniciada = true;
@@ -3073,18 +3079,42 @@
   }
 
   window.addEventListener("DOMContentLoaded", function(){
+    function explicarErrorAuth(err){
+      var code = (err && err.code) ? String(err.code) : "";
+      if(code === "auth/operation-not-allowed" || code === "auth/admin-restricted-operation")
+        return "Falta habilitar 'Anonymous' en Firebase > Authentication > Sign-in method. (" + code + ")";
+      if(code === "auth/network-request-failed")
+        return "Sin conexi\u00f3n a internet. Revisa tu se\u00f1al e intenta de nuevo. (" + code + ")";
+      if(code === "auth/api-key-not-valid.-please-pass-a-valid-api-key." || code === "auth/invalid-api-key" || code.indexOf("api-key") >= 0 || code === "auth/requests-from-referer-blocked")
+        return "La API key de Firebase est\u00e1 restringida o es inv\u00e1lida para este sitio. (" + code + ")";
+      if(code === "auth/too-many-requests")
+        return "Demasiados intentos. Espera un minuto e intenta de nuevo. (" + code + ")";
+      return "No se pudo conectar de forma segura. " + (code ? "(" + code + ")" : (err && err.message ? "(" + err.message + ")" : ""));
+    }
     function avisarErrorAuth(err){
       console.error("Autenticacion anonima fallo:", err);
+      errorAuthTexto = explicarErrorAuth(err);
       ["sync-dot-login","sync-dot-app"].forEach(function(id){ var d = document.getElementById(id); if(d) d.classList.add("off"); });
       ["sync-txt-login","sync-txt-app"].forEach(function(id){ var t = document.getElementById(id); if(t) t.textContent = "sin acceso"; });
       var e = document.getElementById("login-error-generico");
-      if(e) e.textContent = "No se pudo conectar de forma segura. Revisa que 'Anonymous' est\u00e9 habilitado en Firebase Authentication.";
+      if(e) e.textContent = errorAuthTexto;
     }
+    var intentandoAuth = false;
+    function intentarLoginAnonimo(){
+      if(appIniciada || intentandoAuth) return;
+      intentandoAuth = true;
+      firebase.auth().signInAnonymously().then(function(){
+        errorAuthTexto = "";
+      }).catch(avisarErrorAuth).then(function(){ intentandoAuth = false; });
+    }
+    reintentarAuth = intentarLoginAnonimo;
     try{
       firebase.auth().onAuthStateChanged(function(user){
-        if(user){ iniciarApp(); }
-        else { firebase.auth().signInAnonymously().catch(avisarErrorAuth); }
+        if(user){ errorAuthTexto = ""; iniciarApp(); }
+        else { intentarLoginAnonimo(); }
       });
+      // si falla (ej. mala senal), reintenta solo cada 8 segundos
+      setInterval(function(){ if(!appIniciada && errorAuthTexto) intentarLoginAnonimo(); }, 8000);
     }catch(err){ avisarErrorAuth(err); }
   });
 
