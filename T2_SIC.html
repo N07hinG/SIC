@@ -658,6 +658,27 @@
       </div>
     </section>
 
+    <!-- No Disponibles / Recarga (solo Fila 1-4, no aplica al Supervisor) -->
+    <section class="panel solo-backus solo-fila-backus">
+      <div class="panel-title small">No Disponibles / Recarga</div>
+      <div class="campo-dato">
+        <label>Placa</label>
+        <input id="fb-placa" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej: ABC-123" style="text-transform:uppercase;">
+      </div>
+      <div class="campo-dato" style="margin-bottom:0;">
+        <label>Motivo</label>
+        <select id="fb-motivo-nd" class="obs-select">
+          <option value=""></option>
+          <option value="RECARGA">RECARGA</option>
+          <option value="EN RUTA">EN RUTA</option>
+          <option value="EN TALLER">EN TALLER</option>
+          <option value="SIN LLAVE">SIN LLAVE</option>
+          <option value="PROBLEMA MECÁNICO">PROBLEMA MECÁNICO</option>
+          <option value="FUERA DE CD">FUERA DE CD</option>
+        </select>
+      </div>
+    </section>
+
     <section class="panel compact solo-backus solo-sup-backus">
       <div class="panel-title small">Planes de reacci&oacute;n</div>
       <div id="planes-lista"></div>
@@ -1302,7 +1323,9 @@
       horas: normalizarHorasFila(f && f.horas),
       observaciones: normalizarObservaciones(f && f.observaciones),
       nombre: (f && f.nombre) || "",
-      camionesFaltantes: (f && f.camionesFaltantes) || 0
+      camionesFaltantes: (f && f.camionesFaltantes) || 0,
+      placa: (f && f.placa) || "",
+      motivoNoDisp: (f && f.motivoNoDisp) || ""
     };
   }
   function totalCargadoFila(filaId, reg){
@@ -1539,7 +1562,7 @@
     var nuevoRegistro = { transportesProgramados:74, horas: generarHorasPorTurno(estado.turno) };
     if(estado.turno === "Turno 3 - Nocturno"){
       nuevoRegistro.filas = {};
-      FILAS_IDS.forEach(function(fid){ nuevoRegistro.filas[fid] = { horas: generarHorasFilaNoche(), observaciones: ["","",""], nombre:"" }; });
+      FILAS_IDS.forEach(function(fid){ nuevoRegistro.filas[fid] = { horas: generarHorasFilaNoche(), observaciones: ["","",""], nombre:"", placa:"", motivoNoDisp:"" }; });
     }
     db.ref(rutaRegistro("")).set(nuevoRegistro);
     horaSelIdx = 0;
@@ -1637,36 +1660,65 @@
   });
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
+  /* ---- Mensaje "ESTATUS DE CARGA" del Supervisor (formato exacto para WhatsApp) ---- */
+  var MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  function formatearFechaMensaje(d){
+    // Solo DIA y MES, y HORA:MINUTO. Sin a\u00f1o, sin dia de semana, sin segundos.
+    return String(d.getDate()).padStart(2,"0") + " de " + MESES_ES[d.getMonth()] + " - " +
+           String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  }
+  function textoNoDisponible(placa, motivo){
+    placa = String(placa||"").trim(); motivo = String(motivo||"").trim();
+    if(placa && motivo) return placa + " - " + motivo;
+    if(placa) return placa;
+    if(motivo) return "SIN PLACA - " + motivo;
+    return "-";
+  }
+  // x = { fecha:Date, supervisor, armados, cargados, meta, filas:null | [{observaciones:[], placa, motivo} x4] }
+  function construirMensajeStatus(x){
+    var pct = x.meta > 0 ? Math.round((x.cargados / x.meta) * 100) : 0;
+    var l = [];
+    l.push("*STATUS DE CARGA*");
+    l.push("Fecha: " + formatearFechaMensaje(x.fecha));
+    l.push("Supervisor: " + (x.supervisor || "-"));
+    l.push("Armados: " + x.armados + "/" + x.meta);
+    l.push("Cargados: " + x.cargados + "/" + x.meta);
+    l.push("Cumplimiento: " + pct + "%");
+    if(x.filas){
+      // Se juntan las observaciones de las 4 filas y se eliminan duplicados (Set)
+      var todas = [];
+      x.filas.forEach(function(f){ (f.observaciones || []).forEach(function(o){ todas.push(String(o||"").trim()); }); });
+      var unicas = Array.from(new Set(todas.filter(function(o){ return o; })));
+      l.push("");
+      l.push("*OBSERVACION*");
+      if(unicas.length){ unicas.forEach(function(o){ l.push("- " + o); }); }
+      else { l.push("- Ninguna"); }
+      l.push("");
+      l.push("*NO DISPONIBLES/RECARGA*");
+      x.filas.forEach(function(f, i){ l.push("Fila " + (i+1) + ": " + textoNoDisponible(f.placa, f.motivo)); });
+    }
+    return l.join("\n");
+  }
   function generarMensaje(){
     var bundle = obtenerHorasCalculadas();
     if(!bundle) return "";
-    var horas = bundle.horas, meta = bundle.meta;
-    var idx = bundle.esNoche ? (horas.length-1) : horaSelIdx;
-    var h = horas[idx] || {};
-    var pct = meta > 0 ? Math.round(((h.acumCargado||0)/meta)*100) : 0;
-    var msg = "STATUS DE CARGA\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Supervisor: " + (estado.nombreBackus || "-") + "\n" +
-      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + fechaLiveStr() + "\n" +
-      "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
-      (bundle.esNoche ? "" : ("Hora: " + (h.hora||"-") + "\n")) +
-      "Armados (acum.): " + (h.acumArmado||0) + "\n" +
-      "Cargados (acum.): " + (h.acumCargado||0) + " / " + (meta||0) + "\n" +
-      (bundle.esNoche && bundle.totalBoost > 0 ? (bundle.totalReal + "/" + (meta||0) + " Cargados Reales\n") : "") +
-      "Cumplimiento: " + pct + "%";
+    var armados = 0;
+    bundle.reg.horas.forEach(function(h){ armados += (h.armado||0); });
+    var datos = {
+      fecha: fechaReal(),
+      supervisor: estado.nombreBackus,
+      armados: armados,
+      cargados: bundle.totalReal, // cargados REALES (sin el ajuste de camiones faltantes del grafico)
+      meta: bundle.meta,
+      filas: null
+    };
     if(bundle.esNoche){
-      msg += "\n\nDETALLE POR FILA:";
-      FILAS_IDS.forEach(function(fid){
-        var freg = registroFilaActual(fid, bundle.reg);
-        var totalFila = 0;
-        freg.horas.forEach(function(hh){ totalFila += (hh.cargado||0); });
-        var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
-        var hayFalta = freg.observaciones.indexOf(OBS_FALTA_CAMIONES) >= 0;
-        msg += "\n" + nombreFila(fid) + ": " + totalFila + " cargados" + (obs ? " - " + obs : "") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "");
+      datos.filas = FILAS_IDS.map(function(fid){
+        var f = registroFilaActual(fid, bundle.reg);
+        return { observaciones: f.observaciones, placa: f.placa, motivo: f.motivoNoDisp };
       });
     }
-    return msg;
+    return construirMensajeStatus(datos);
   }
   function actualizarMensaje(){ document.getElementById("mensaje-texto").textContent = generarMensaje(); }
   document.getElementById("btn-estatus").addEventListener("click", function(){
@@ -1867,7 +1919,8 @@
       "Fecha: " + fechaLiveStr() + "\n" +
       "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
       "Cargados (acum. de la fila): " + total + "\n" +
-      "OBSERVACION: " + (obs || "Ninguna") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "");
+      "OBSERVACION: " + (obs || "Ninguna") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "") +
+      (freg.placa || freg.motivoNoDisp ? "\nNO DISPONIBLES/RECARGA: " + textoNoDisponible(freg.placa, freg.motivoNoDisp) : "");
   }
   function actualizarMensajeFila(){
     var el = document.getElementById("fb-mensaje-texto");
@@ -1942,6 +1995,33 @@
     actualizarMensajeFila();
   });
 
+  /* ---- No Disponibles / Recarga (por fila): placa en mayusculas + motivo ---- */
+  function guardarCampoFilaLocal(campo, valor){
+    var turnoId = TURNO_ID[estado.turno], filaId = estado.filaBackus;
+    if(!turnoId || !filaId) return;
+    if(!cacheRegistros[turnoId]) cacheRegistros[turnoId] = {};
+    if(!cacheRegistros[turnoId].filas) cacheRegistros[turnoId].filas = {};
+    if(!cacheRegistros[turnoId].filas[filaId]) cacheRegistros[turnoId].filas[filaId] = {};
+    cacheRegistros[turnoId].filas[filaId][campo] = valor;
+  }
+  var guardarPlacaFila = debounce(function(v){
+    db.ref(rutaRegistro("filas/" + estado.filaBackus + "/placa")).set(v);
+  }, 400);
+  document.getElementById("fb-placa").addEventListener("input", function(){
+    var pos = this.selectionStart;
+    var v = this.value.toUpperCase().replace(/[^A-Z0-9\- ]/g, "");
+    this.value = v;
+    try{ this.setSelectionRange(pos, pos); }catch(e){}
+    guardarCampoFilaLocal("placa", v.trim());
+    guardarPlacaFila(v.trim());
+    actualizarMensajeFila();
+  });
+  document.getElementById("fb-motivo-nd").addEventListener("change", function(){
+    guardarCampoFilaLocal("motivoNoDisp", this.value);
+    db.ref(rutaRegistro("filas/" + estado.filaBackus + "/motivoNoDisp")).set(this.value);
+    actualizarMensajeFila();
+  });
+
   function renderFilaBackus(){
     var elNombre = document.getElementById("fb-fila-nombre");
     if(elNombre) elNombre.textContent = nombreFila(estado.filaBackus);
@@ -1951,6 +2031,10 @@
     renderHorasGridFila();
     bindDatosHoraFila();
     renderObservacionesFila();
+    var fregND = registroFilaActual(estado.filaBackus);
+    fijarSiNoEnfocado(document.getElementById("fb-placa"), fregND.placa);
+    var selND = document.getElementById("fb-motivo-nd");
+    if(selND && document.activeElement !== selND) selND.value = fregND.motivoNoDisp;
     actualizarMensajeFila();
     actualizarUIPlanAccionFila();
     verificarAlarma();
