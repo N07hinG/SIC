@@ -522,28 +522,16 @@
       </div>
     </section>
 
-    <!-- Centralizado (solo Externo/Lavoro) -->
+    <!-- Grafica de armados (solo Externo/Lavoro): mismo componente que la de ABInBev -->
     <section class="panel solo-lavoro">
-      <div class="panel-title small">Centralizado</div>
-      <div class="grid2">
-        <div class="campo-mini">
-          <label>Hora</label>
-          <select id="cent-hora">
-            <option value="" selected disabled>Selecciona</option>
-            <option value="7:00">7:00</option>
-            <option value="9:30">9:30</option>
-            <option value="1:00">1:00</option>
-            <option value="3:30">3:30</option>
-            <option value="6:00">6:00</option>
-          </select>
-        </div>
-        <div class="campo-mini">
-          <label>Cantidad PH</label>
-          <input id="cent-cantidad" inputmode="numeric" value="0">
-        </div>
+      <div class="panel-title">Unidades armadas x hora planificada<span class="tag" id="armado-tag-total">0/0</span></div>
+      <div class="chart-wrap"><canvas id="grafico-armado"></canvas></div>
+      <div class="estado-fila">
+        <span class="dot" id="armado-estado-dot" style="background:var(--rojo)"></span>
+        <span class="estado-txt" id="armado-estado-txt">Sin datos a&uacute;n</span>
+        <span class="estado-pct num" id="armado-estado-pct">0%</span>
       </div>
-      <button class="btn btn-amber" id="cent-btn-guardar" type="button" style="margin-top:10px;">Guardar registro</button>
-      <div class="sorting-total-personal" id="cent-resumen" style="margin-top:12px;">Has armado 0 / Total Backus 0</div>
+      <div class="sorting-total-personal" id="armado-resumen" style="margin-top:12px;">Has armado 0 / Total Backus Programados 0</div>
     </section>
 
     <section class="panel solo-sorting">
@@ -1152,7 +1140,6 @@
       if(tituloGrafico) tituloGrafico.childNodes[0].nodeValue = estado.monitoreo;
 
       suscribirFecha(estado.fecha);
-      if(rolActual === "lavoro") actualizarResumenCentralizado();
       if(!fechaCambio){
         renderPlanes();
         if(rolActual && rolActual !== "sorting") render();
@@ -1611,53 +1598,8 @@
   function bindInfoLavoro(){
     document.getElementById("lv-turno").textContent = nombreCortoTurno(estado.turno);
     document.getElementById("lv-fecha").textContent = estado.fecha || "-";
-    suscribirPHRegistros();
-    actualizarResumenCentralizado();
+    actualizarResumenArmado();
   }
-
-  /* ============== CENTRALIZADO (solo Externo/Lavoro) ==============
-     Cada registro (hora + cantidad PH) se guarda en /ph_registros,
-     separado por fecha+turno, con push() para que varios dispositivos
-     puedan agregar registros sin pisarse entre si. El resumen "Has
-     armado X" suma todos los registros del turno actual; "Total Backus"
-     es el numero que el Supervisor Backus escribe en su cabecera. */
-  var refPHRegistros = null;
-  var cachePHRegistros = {};
-  var phRegistrosSuscrito = null;
-  function clavePHRegistros(){ return fk(estado.fecha) + "/" + TURNO_ID[estado.turno]; }
-  function suscribirPHRegistros(){
-    if(!estado.turno) return;
-    var clave = clavePHRegistros();
-    if(phRegistrosSuscrito === clave) return;
-    phRegistrosSuscrito = clave;
-    if(refPHRegistros) refPHRegistros.off();
-    refPHRegistros = db.ref("ph_registros/" + clave);
-    refPHRegistros.on("value", function(snap){
-      cachePHRegistros = snap.val() || {};
-      if(rolActual === "lavoro") actualizarResumenCentralizado();
-    });
-  }
-  function totalPHArmadoExterno(){
-    var total = 0;
-    Object.keys(cachePHRegistros).forEach(function(k){ total += (cachePHRegistros[k].cantidad || 0); });
-    return total;
-  }
-  function actualizarResumenCentralizado(){
-    var el = document.getElementById("cent-resumen");
-    if(!el) return;
-    el.textContent = "Has armado " + totalPHArmadoExterno() + " / Total Backus " + (estado.totalPHDia || 0);
-  }
-  document.getElementById("cent-btn-guardar").addEventListener("click", function(){
-    var hora = document.getElementById("cent-hora").value;
-    var cantidad = Number(document.getElementById("cent-cantidad").value) || 0;
-    if(!hora){ toast("Selecciona una hora."); return; }
-    if(!estado.turno){ return; }
-    var nuevaRef = db.ref("ph_registros/" + clavePHRegistros()).push();
-    nuevaRef.set({ hora: hora, cantidad: cantidad, ts: Date.now() + offsetServidorMs, encargado: estado.nombreLavoro || "" });
-    document.getElementById("cent-cantidad").value = 0;
-    document.getElementById("cent-hora").value = "";
-    toast("Registro guardado en Centralizado.");
-  });
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   /* ---- Mensaje "ESTATUS DE CARGA" del Supervisor (formato exacto para WhatsApp) ---- */
@@ -1791,7 +1733,7 @@
       btn.innerHTML = escapeAttr(h.hora) + (tieneDatos ? '<span class="chk">&#10003;</span>' : '');
       btn.addEventListener("click", function(){
         horaSelIdx = i;
-        renderHorasGrid(); bindDatosHora(); dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
+        renderHorasGrid(); bindDatosHora(); dibujarGrafico(); dibujarGraficoArmado(); actualizarMensaje(); actualizarMensajeArmado();
       });
       cont.appendChild(btn);
     });
@@ -1830,7 +1772,7 @@
       toast("Cargados ajustado: no puede superar lo armado (m\u00e1x. " + maxPermitido + ")");
     }
     db.ref(rutaRegistro("horas/"+horaSelIdx+"/armado")).set(reg.horas[horaSelIdx].armado);
-    dibujarGrafico(); actualizarMensaje(); actualizarMensajeArmado();
+    dibujarGrafico(); dibujarGraficoArmado(); actualizarResumenArmado(); actualizarMensaje(); actualizarMensajeArmado();
   });
 
   document.getElementById("d-cargado").addEventListener("input", function(){
@@ -1902,7 +1844,6 @@
     renderHorasGridFila();
     actualizarMensajeFila();
     verificarAlarma();
-    verificarAlarmaFilasNoche();
     toast("Datos actualizados");
   });
 
@@ -2038,7 +1979,6 @@
     actualizarMensajeFila();
     actualizarUIPlanAccionFila();
     verificarAlarma();
-    verificarAlarmaFilasNoche();
   }
 
   /* ============== ABInBev / TURNO NOCHE: DETALLE POR FILA (solo Supervisor) ============== */
@@ -2110,12 +2050,21 @@
   }
 
   /* ============== GRAFICO PRINCIPAL (solo Backus, canvas nativo) ============== */
+  /* Componente de grafica compartido (ABInBev = cargados, Externo = armados).
+     Recibe las horas ya calculadas (cada una con .hora, .pct y .acumCargado
+     = el acumulado de la metrica que se grafica) y los ids de su estado. */
   function dibujarGrafico(){
     var bundle = obtenerHorasCalculadas();
     if(!bundle) return;
     var horas = bundle.horas;
-    var meta = bundle.meta;
-    var canvas = document.getElementById("grafico");
+    var actual = bundle.esNoche ? (horas[horas.length-1] || {pct:0, acumCargado:0}) : (horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0});
+    dibujarGraficoBase({ canvasId:"grafico", horas:horas, meta:bundle.meta, actual:actual,
+      dotId:"estado-dot", txtId:"estado-txt", pctId:"estado-pct", tagId:"tag-total" });
+  }
+  function dibujarGraficoBase(o){
+    var horas = o.horas;
+    var meta = o.meta;
+    var canvas = document.getElementById(o.canvasId);
     var wrap = canvas.parentElement;
     if(!wrap || !horas.length) return;
 
@@ -2196,11 +2145,11 @@
       ctx.fillText(h.hora, x, y);
     });
 
-    var actual = bundle.esNoche ? (horas[horas.length-1] || {pct:0, acumCargado:0}) : (horas[horaSelIdx] || horas[horas.length-1] || {pct:0, acumCargado:0});
+    var actual = o.actual;
     var pctUlt = Math.round((actual.pct||0)*100);
-    var dot = document.getElementById("estado-dot");
-    var txt = document.getElementById("estado-txt");
-    var pctEl = document.getElementById("estado-pct");
+    var dot = document.getElementById(o.dotId);
+    var txt = document.getElementById(o.txtId);
+    var pctEl = document.getElementById(o.pctId);
     var color, mensaje;
     if(pctUlt >= 90){ color="var(--verde)"; mensaje="En verde, dentro de meta"; }
     else if(pctUlt >= 50){ color="var(--amber)"; mensaje="En rango de alerta"; }
@@ -2210,8 +2159,36 @@
     pctEl.textContent = pctUlt + "%";
     pctEl.style.color = color;
 
-    document.getElementById("tag-total").textContent = (actual.acumCargado||0)+"/"+(meta||0);
+    document.getElementById(o.tagId).textContent = (actual.acumCargado||0)+"/"+(meta||0);
   }
+  /* ---- Externo: misma grafica, con ARMADOS (acumulado por hora / programados) ---- */
+  function obtenerHorasArmadoCalculadas(){
+    var reg = registroActual();
+    if(!reg) return null;
+    var meta = reg.transportesProgramados || 0;
+    var suma = 0;
+    var horas = reg.horas.map(function(h){
+      suma += (h.armado || 0);
+      return { hora: h.hora, pct: meta > 0 ? suma / meta : 0, acumCargado: suma };
+    });
+    return { horas: horas, meta: meta, total: suma };
+  }
+  function dibujarGraficoArmado(){
+    var b = obtenerHorasArmadoCalculadas();
+    if(!b || !b.horas.length) return;
+    var actual = b.horas[horaSelIdx] || b.horas[b.horas.length-1] || {pct:0, acumCargado:0};
+    dibujarGraficoBase({ canvasId:"grafico-armado", horas:b.horas, meta:b.meta, actual:actual,
+      dotId:"armado-estado-dot", txtId:"armado-estado-txt", pctId:"armado-estado-pct", tagId:"armado-tag-total" });
+  }
+  // Contador: "Has armado X / Total Backus Programados Y"
+  function actualizarResumenArmado(){
+    var el = document.getElementById("armado-resumen");
+    if(!el) return;
+    var b = obtenerHorasArmadoCalculadas();
+    if(!b) return;
+    el.textContent = "Has armado " + b.total + " / Total Backus Programados " + b.meta;
+  }
+
 
   /* ============== DASHBOARD PANTALLA INICIAL (publico, sin login, en vivo) ============== */
   function dibujarGraficoInicio(pctArmado, pctCargado){
@@ -2302,6 +2279,7 @@
       if(document.getElementById("vista-app").style.display !== "none"){ dibujarGrafico(); }
       if(document.getElementById("vista-login").style.display !== "none"){ actualizarDashboardInicio(); }
       if(rolActual === "sorting" && esTurnoDia()){ dibujarGraficoSortingDia(); }
+      if(rolActual === "lavoro"){ dibujarGraficoArmado(); }
     }, 150);
   });
 
@@ -2332,7 +2310,7 @@
     var reg = registroActual();
     if(!reg) return;
     guardarEnHistorico();
-    dibujarGrafico(); renderHorasGrid();
+    dibujarGrafico(); dibujarGraficoArmado(); actualizarResumenArmado(); renderHorasGrid();
     actualizarMensaje(); actualizarMensajeArmado();
     verificarAlarma();
     toast("Hora " + reg.horas[horaSelIdx].hora + " actualizada");
@@ -2382,37 +2360,6 @@
   var alarmaSonidoId = null;
   var monitorAlarmaId = null;
 
-  function minutosDesdeInicioTurno(){
-    if(!estado || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var ahora = fechaReal();
-    var actualMin = ahora.getHours()*60 + ahora.getMinutes();
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
-    var diff = actualMin - inicioMin;
-    if(diff < 0) diff += 24*60;
-    return diff;
-  }
-  function minutosDesdeInicioHastaCorte(){
-    if(!estado || !TURNO_CORTE[estado.turno] || !TURNO_INICIO.hasOwnProperty(estado.turno)) return null;
-    var corte = TURNO_CORTE[estado.turno];
-    var corteMin = corte.h*60 + corte.m;
-    var inicioMin = TURNO_INICIO[estado.turno]*60;
-    var diff = corteMin - inicioMin;
-    if(diff < 0) diff += 24*60;
-    return diff;
-  }
-  function horaDeCortePasada(){
-    var transcurrido = minutosDesdeInicioTurno();
-    var hastaCorte = minutosDesdeInicioHastaCorte();
-    if(transcurrido === null || hastaCorte === null) return false;
-    if(transcurrido > 480 + 60) return false;
-    return transcurrido >= hastaCorte;
-  }
-  function pctCumplimientoActual(){
-    if(!estado || !estado.turno) return 0;
-    var bundle = obtenerHorasCalculadas();
-    if(!bundle || !bundle.horas.length) return 0;
-    return bundle.horas[bundle.horas.length-1].pct || 0;
-  }
   function reproducirBeep(){
     try{
       var Ctx = window.AudioContext || window.webkitAudioContext;
@@ -2460,61 +2407,20 @@
   }
   function actualizarUIPlanAccion(){ actualizarPlanAccionApp(); actualizarAlertaInicio(); actualizarUIPlanAccionFila(); }
 
-  function dispararAlarma(){
-    if(alarmaActiva) return;
-    alarmaActiva = true;
-    if(alarmaSonidoId) clearInterval(alarmaSonidoId);
-    reproducirBeep();
-    alarmaSonidoId = setInterval(reproducirBeep, 1500);
-    actualizarUIPlanAccion();
-    toast("\u26A0 No se alcanz\u00f3 el 50% a la hora de corte. Activa el Plan de Acci\u00f3n.");
-  }
   function silenciarAlarma(sinAviso){
     alarmaActiva = false;
     if(alarmaSonidoId){ clearInterval(alarmaSonidoId); alarmaSonidoId = null; }
     actualizarUIPlanAccion();
     if(!sinAviso) toast("Alarma silenciada");
   }
+  // La alarma de "meta del 50% a la hora de corte" fue DESACTIVADA: ya no suena,
+  // no parpadea y no muestra aviso. Se conserva la funcion (sin disparar nada)
+  // para no tocar los lugares que la llaman.
   function verificarAlarma(){
-    if(!estado || !estado.turno) { actualizarUIPlanAccion(); return; }
-    if(horaDeCortePasada() && pctCumplimientoActual() < 0.5){ dispararAlarma(); }
-    else { actualizarUIPlanAccion(); }
+    if(alarmaActiva){ silenciarAlarma(true); return; }
+    actualizarUIPlanAccion();
   }
 
-  /* ============== ALARMA: DATOS DE CARGADO FALTANTES POR HORA (SOLO TURNO NOCHE) ==============
-     Suena si, para alguna de las 7 horas habilitadas, ya paso el momento
-     limite (el inicio de la SIGUIENTE hora habilitada) y NINGUNA de las
-     4 filas subio Cargados en esa hora. No aplica a turno tarde ni dia. */
-  var alarmaFilasNocheActiva = false;
-  var alarmaFilasNocheSonidoId = null;
-
-  function dispararAlarmaFilasNoche(){
-    if(alarmaFilasNocheActiva) return;
-    alarmaFilasNocheActiva = true;
-    if(alarmaFilasNocheSonidoId) clearInterval(alarmaFilasNocheSonidoId);
-    reproducirBeep();
-    alarmaFilasNocheSonidoId = setInterval(reproducirBeep, 1500);
-    toast("\u26A0 Hay una hora sin Cargados subidos por ninguna fila.");
-  }
-  function detenerAlarmaFilasNoche(){
-    alarmaFilasNocheActiva = false;
-    if(alarmaFilasNocheSonidoId){ clearInterval(alarmaFilasNocheSonidoId); alarmaFilasNocheSonidoId = null; }
-  }
-  function verificarAlarmaFilasNoche(){
-    if(rolActual !== "backus" || estado.turno !== "Turno 3 - Nocturno"){ detenerAlarmaFilasNoche(); return; }
-    var reg = registroActual();
-    if(!reg){ detenerAlarmaFilasNoche(); return; }
-    var agregadas = horasAgregadasNoche(reg);
-    var transcurrido = minutosDesdeInicioTurno();
-    if(transcurrido === null){ detenerAlarmaFilasNoche(); return; }
-    var hayFaltante = false;
-    for(var i=0; i<OFFSETS_FILA_NOCHE.length; i++){
-      var siguienteOffset = (i < OFFSETS_FILA_NOCHE.length-1) ? OFFSETS_FILA_NOCHE[i+1] : (OFFSETS_FILA_NOCHE[i]+1);
-      var limiteMin = siguienteOffset * 60;
-      if(transcurrido >= limiteMin && (agregadas[i].cargado||0) === 0){ hayFaltante = true; break; }
-    }
-    if(hayFaltante) dispararAlarmaFilasNoche(); else detenerAlarmaFilasNoche();
-  }
 
   /* ============== ALARMA: SORTING / TURNO DIA (bloque no entregado a su hora) ==============
      Suena SOLO para el rol Sorting, SOLO cuando su turno es "Turno 1 -
@@ -2552,11 +2458,9 @@
   function iniciarMonitorAlarma(){
     if(monitorAlarmaId) clearInterval(monitorAlarmaId);
     verificarAlarma();
-    verificarAlarmaFilasNoche();
     verificarAlarmaSortingDia();
     monitorAlarmaId = setInterval(function(){
       verificarAlarma();
-      verificarAlarmaFilasNoche();
       verificarAlarmaSortingDia();
       // El estado de los bloques de Sorting Dia depende del reloj (no solo
       // de los datos), asi que se refresca visualmente cada 20s tambien.
@@ -3117,6 +3021,7 @@
     bindDatosHora();
     renderPlanes();
     dibujarGrafico();
+    if(rolActual === "lavoro"){ dibujarGraficoArmado(); actualizarResumenArmado(); }
     actualizarPanelDetalleFilas();
     if(rolActual === "backus") renderHistorico();
     actualizarMensaje();
