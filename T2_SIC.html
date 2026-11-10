@@ -341,6 +341,17 @@
     background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:32px;
   }
   .obs-select:focus{border-color:var(--amber);}
+  .unidad-card{border:1px solid var(--border);border-radius:9px;padding:10px;margin-bottom:10px;background:var(--panel-2);}
+  .unidad-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .unidad-num{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13.5px;color:var(--text);}
+  .unidad-quitar{background:transparent;border:1px solid var(--border);color:var(--rojo);border-radius:7px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;}
+  .unidad-fila{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+  .unidad-fila label{display:block;font-size:11px;color:var(--text-soft);margin-bottom:4px;}
+  .unidad-transp{display:flex;align-items:center;gap:6px;}
+  .unidad-transp span{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--amber);font-size:14px;}
+  .unidad-input{width:100%;min-width:0;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 10px;font-size:13.5px;outline:none;font-family:'Roboto Mono',monospace;font-weight:600;}
+  .unidad-input:focus{border-color:var(--amber);}
+  .unidad-aviso{font-size:10.5px;color:var(--amber);min-height:13px;}
 </style>
 </head>
 <body>
@@ -646,25 +657,11 @@
       </div>
     </section>
 
-    <!-- No Disponibles / Recarga (solo Fila 1-4, no aplica al Supervisor) -->
+    <!-- UNIDADES PENDIENTES (solo Fila 1-4; cada fila tiene su propia lista; el Supervisor solo la ve) -->
     <section class="panel solo-backus solo-fila-backus">
-      <div class="panel-title small">No Disponibles / Recarga</div>
-      <div class="campo-dato">
-        <label>Placa</label>
-        <input id="fb-placa" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej: ABC-123" style="text-transform:uppercase;">
-      </div>
-      <div class="campo-dato" style="margin-bottom:0;">
-        <label>Motivo</label>
-        <select id="fb-motivo-nd" class="obs-select">
-          <option value=""></option>
-          <option value="RECARGA">RECARGA</option>
-          <option value="EN RUTA">EN RUTA</option>
-          <option value="EN TALLER">EN TALLER</option>
-          <option value="SIN LLAVE">SIN LLAVE</option>
-          <option value="PROBLEMA MECÁNICO">PROBLEMA MECÁNICO</option>
-          <option value="FUERA DE CD">FUERA DE CD</option>
-        </select>
-      </div>
+      <div class="panel-title small">UNIDADES PENDIENTES</div>
+      <div id="fb-unidades-lista"></div>
+      <button class="btn" id="fb-unidad-agregar" type="button" style="margin-top:4px;">+ Agregar unidad</button>
     </section>
 
     <section class="panel compact solo-backus solo-sup-backus">
@@ -927,7 +924,10 @@
     "Producto Terminado sin desencimar",
     "Generaci\u00f3n de Orden Interna x Producto sin stock/Frescura",
     "Falta Disponibilidad de Camiones",
-    "Retraso Armado Lavoro"
+    "Retraso Armado Lavoro",
+    "Retraso x Liberaci\u00f3n de Salida",
+    "Unidad en Ruta",
+    "Ausencia de Movilizador"
   ];
   var OBS_FALTA_CAMIONES = "Falta Disponibilidad de Camiones";
 
@@ -952,6 +952,23 @@
       });
     }
     return base;
+  }
+  // Unidades pendientes de una fila: objeto {idPush: {transporte, placa, tipo, motivo}}
+  var UNIDAD_TIPOS = ["Makro","Tottus","Ajiles","HxH","Productores","Bloque 1","Bloque Final","BF"];
+  var UNIDAD_MOTIVOS = ["En Taller","En Ruta","Sin Llave","Estructura Da\u00f1ada","Cortina Da\u00f1ado"];
+  function normalizarUnidades(u){
+    if(!u || typeof u !== "object") return [];
+    return Object.keys(u).sort().map(function(id){
+      var x = u[id] || {};
+      return { id:id, transporte:String(x.transporte||""), placa:String(x.placa||""), tipo:String(x.tipo||""), motivo:String(x.motivo||"") };
+    });
+  }
+  // Una unidad cuenta (en mensajes) solo si esta completa: T- + 5 digitos, placa, tipo y motivo
+  function unidadCompleta(u){
+    return /^[0-9]{5}$/.test(u.transporte) && !!String(u.placa).trim() && !!u.tipo && !!u.motivo;
+  }
+  function textoUnidadPendiente(u){
+    return "T-" + u.transporte + " - *" + String(u.placa).trim().toUpperCase() + "* - " + u.tipo + " - " + String(u.motivo).toLowerCase();
   }
   function normalizarObservaciones(obs){
     if(Array.isArray(obs) && obs.length) return obs;
@@ -1249,9 +1266,9 @@
     var turnoId = TURNO_ID[turnoNombre];
     var claveF = fk(fecha);
     var ref = db.ref("registros/"+claveF+"/"+turnoId);
-    ref.once("value").then(function(snap){
+    return ref.once("value").then(function(snap){
       if(!snap.exists()){
-        ref.set({ transportesProgramados:74, horas: generarHorasPorTurno(turnoNombre) });
+        return ref.set({ transportesProgramados:74, horas: generarHorasPorTurno(turnoNombre) });
       }
     });
   }
@@ -1311,8 +1328,7 @@
       observaciones: normalizarObservaciones(f && f.observaciones),
       nombre: (f && f.nombre) || "",
       camionesFaltantes: (f && f.camionesFaltantes) || 0,
-      placa: (f && f.placa) || "",
-      motivoNoDisp: (f && f.motivoNoDisp) || ""
+      unidades: normalizarUnidades(f && f.unidades)
     };
   }
   function totalCargadoFila(filaId, reg){
@@ -1472,10 +1488,11 @@
       if(rolSeleccionado === "backus"){
         estado.nombreBackus = nombre;
         estado.filaBackus = filaElegida;
-        asegurarRegistroExiste(turno, estado.fecha);
-        if(FILAS_IDS.indexOf(filaElegida) >= 0){
-          db.ref(rutaRegistro("filas/"+filaElegida+"/nombre")).set(nombre);
-        }
+        var rutaNombreFila = FILAS_IDS.indexOf(filaElegida) >= 0 ? rutaRegistro("filas/"+filaElegida+"/nombre") : null;
+        // El nombre se guarda DESPUES de asegurar el registro, para que la creacion inicial no lo pise.
+        asegurarRegistroExiste(turno, estado.fecha).then(function(){
+          if(rutaNombreFila) db.ref(rutaNombreFila).set(nombre);
+        });
       } else if(rolSeleccionado === "sorting"){
         estado.nombreSorting = nombre;
         asegurarRegistroSortingExiste(turno);
@@ -1549,7 +1566,7 @@
     var nuevoRegistro = { transportesProgramados:74, horas: generarHorasPorTurno(estado.turno) };
     if(estado.turno === "Turno 3 - Nocturno"){
       nuevoRegistro.filas = {};
-      FILAS_IDS.forEach(function(fid){ nuevoRegistro.filas[fid] = { horas: generarHorasFilaNoche(), observaciones: ["","",""], nombre:"", placa:"", motivoNoDisp:"" }; });
+      FILAS_IDS.forEach(function(fid){ nuevoRegistro.filas[fid] = { horas: generarHorasFilaNoche(), observaciones: ["","",""], nombre:"" }; });
     }
     db.ref(rutaRegistro("")).set(nuevoRegistro);
     horaSelIdx = 0;
@@ -1603,42 +1620,58 @@
 
   /* ============== ESTATUS DE CARGA (mensaje Backus) ============== */
   /* ---- Mensaje "ESTATUS DE CARGA" del Supervisor (formato exacto para WhatsApp) ---- */
-  var MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  function formatearFechaMensaje(d){
-    // Solo DIA y MES, y HORA:MINUTO. Sin a\u00f1o, sin dia de semana, sin segundos.
-    return String(d.getDate()).padStart(2,"0") + " de " + MESES_ES[d.getMonth()] + " - " +
-           String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  function dosDig(n){ return String(n).padStart(2,"0"); }
+  // Supervisor: "06/11 - 09:00" (solo dia/mes y hora/minuto, 24 h)
+  function formatearFechaCorta(d){
+    return dosDig(d.getDate()) + "/" + dosDig(d.getMonth()+1) + " - " + dosDig(d.getHours()) + ":" + dosDig(d.getMinutes());
   }
-  function textoNoDisponible(placa, motivo){
-    placa = String(placa||"").trim(); motivo = String(motivo||"").trim();
-    if(placa && motivo) return placa + " - " + motivo;
-    if(placa) return placa;
-    if(motivo) return "SIN PLACA - " + motivo;
-    return "-";
+  // Fila: "06/11 03:00 am" (solo espacios entre fecha y hora, hora de 12 h)
+  function formatearFechaHora12(d){
+    var h = d.getHours(), p = h < 12 ? "am" : "pm", h12 = h % 12; if(h12 === 0) h12 = 12;
+    return dosDig(d.getDate()) + "/" + dosDig(d.getMonth()+1) + " " + dosDig(h12) + ":" + dosDig(d.getMinutes()) + " " + p;
   }
-  // x = { fecha:Date, supervisor, armados, cargados, meta, filas:null | [{observaciones:[], placa, motivo} x4] }
+  function observacionesUnicas(listas){
+    var todas = [];
+    listas.forEach(function(lista){ (lista || []).forEach(function(o){ todas.push(String(o||"").trim()); }); });
+    return Array.from(new Set(todas.filter(function(o){ return o; })));
+  }
+  // x = { fecha:Date, supervisor, armados, cargados, meta, filas:null | [{observaciones:[], unidades:[]} x4] }
   function construirMensajeStatus(x){
     var pct = x.meta > 0 ? Math.round((x.cargados / x.meta) * 100) : 0;
     var l = [];
     l.push("*STATUS DE CARGA*");
-    l.push("Fecha: " + formatearFechaMensaje(x.fecha));
+    l.push("Fecha: " + formatearFechaCorta(x.fecha));
     l.push("Supervisor: " + (x.supervisor || "-"));
     l.push("Armados: " + x.armados + "/" + x.meta);
     l.push("Cargados: " + x.cargados + "/" + x.meta);
     l.push("Cumplimiento: " + pct + "%");
     if(x.filas){
-      // Se juntan las observaciones de las 4 filas y se eliminan duplicados (Set)
-      var todas = [];
-      x.filas.forEach(function(f){ (f.observaciones || []).forEach(function(o){ todas.push(String(o||"").trim()); }); });
-      var unicas = Array.from(new Set(todas.filter(function(o){ return o; })));
+      var unicas = observacionesUnicas(x.filas.map(function(f){ return f.observaciones; }));
       l.push("");
       l.push("*OBSERVACION*");
       if(unicas.length){ unicas.forEach(function(o){ l.push("- " + o); }); }
       else { l.push("- Ninguna"); }
       l.push("");
-      l.push("*NO DISPONIBLES/RECARGA*");
-      x.filas.forEach(function(f, i){ l.push("Fila " + (i+1) + ": " + textoNoDisponible(f.placa, f.motivo)); });
+      l.push("*UNIDADES PENDIENTES*");
+      x.filas.forEach(function(f, i){
+        var completas = (f.unidades || []).filter(unidadCompleta);
+        if(!completas.length){ l.push("Fila " + (i+1) + ": -"); return; }
+        completas.forEach(function(u){ l.push("Fila " + (i+1) + ": " + textoUnidadPendiente(u)); });
+      });
     }
+    return l.join("\n");
+  }
+  // x = { fecha:Date, fila:"FILA 2", asistente, cargados, observaciones:[] }
+  function construirMensajeFila(x){
+    var unicas = observacionesUnicas([x.observaciones]);
+    var l = [];
+    l.push("*" + x.fila + " " + formatearFechaHora12(x.fecha) + "*");
+    l.push("Asistente: *" + (x.asistente || "-") + "*");
+    l.push("Cargados: *" + x.cargados + "*");
+    l.push("");
+    l.push("OBSERVACIONES:");
+    if(unicas.length){ unicas.forEach(function(o){ l.push("- " + o); }); }
+    else { l.push("- Ninguna"); }
     return l.join("\n");
   }
   function generarMensaje(){
@@ -1657,7 +1690,7 @@
     if(bundle.esNoche){
       datos.filas = FILAS_IDS.map(function(fid){
         var f = registroFilaActual(fid, bundle.reg);
-        return { observaciones: f.observaciones, placa: f.placa, motivo: f.motivoNoDisp };
+        return { observaciones: f.observaciones, unidades: f.unidades };
       });
     }
     return construirMensajeStatus(datos);
@@ -1850,18 +1883,11 @@
   function generarMensajeFila(){
     var filaId = estado.filaBackus;
     var freg = registroFilaActual(filaId);
-    var total = 0; freg.horas.forEach(function(h){ total += (h.cargado||0); });
-    var obs = freg.observaciones.filter(function(o){ return o && o.trim(); }).join(", ");
-    var hayFalta = freg.observaciones.indexOf(OBS_FALTA_CAMIONES) >= 0;
-    return "STATUS DE CARGA - " + nombreFila(filaId) + "\n" +
-      "Turno: " + nombreCortoTurno(estado.turno) + "\n" +
-      "Encargado: " + (estado.nombreBackus || "-") + "\n" +
-      "Plan de Accion: " + (alarmaActiva ? "SI" : "No") + "\n" +
-      "Fecha: " + fechaLiveStr() + "\n" +
-      "Hora de Env\u00edo: " + horaLiveStr() + "\n" +
-      "Cargados (acum. de la fila): " + total + "\n" +
-      "OBSERVACION: " + (obs || "Ninguna") + (hayFalta ? " - Motivo: " + OBS_FALTA_CAMIONES : "") +
-      (freg.placa || freg.motivoNoDisp ? "\nNO DISPONIBLES/RECARGA: " + textoNoDisponible(freg.placa, freg.motivoNoDisp) : "");
+    var total = 0; freg.horas.forEach(function(h){ total += (h.cargado||0); }); // solo lo que cargo ESTA fila
+    return construirMensajeFila({
+      fecha: fechaReal(), fila: nombreFila(filaId).toUpperCase(),
+      asistente: estado.nombreBackus, cargados: total, observaciones: freg.observaciones
+    });
   }
   function actualizarMensajeFila(){
     var el = document.getElementById("fb-mensaje-texto");
@@ -1914,7 +1940,10 @@
     cont.querySelectorAll(".obs-select").forEach(function(sel){
       sel.addEventListener("change", function(){
         var i = Number(this.dataset.i);
-        db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones/"+i)).set(this.value);
+        // Se guarda la lista completa (no solo ese espacio) para no perder los demas espacios.
+        var nuevas = registroFilaActual(estado.filaBackus).observaciones.slice();
+        nuevas[i] = this.value;
+        db.ref(rutaRegistro("filas/"+estado.filaBackus+"/observaciones")).set(nuevas);
         actualizarMensajeFila();
       });
     });
@@ -1936,31 +1965,110 @@
     actualizarMensajeFila();
   });
 
-  /* ---- No Disponibles / Recarga (por fila): placa en mayusculas + motivo ---- */
-  function guardarCampoFilaLocal(campo, valor){
+  /* ---- UNIDADES PENDIENTES (por fila): lista propia de cada fila ---- */
+  function cacheFilaUnidades(){
     var turnoId = TURNO_ID[estado.turno], filaId = estado.filaBackus;
-    if(!turnoId || !filaId) return;
     if(!cacheRegistros[turnoId]) cacheRegistros[turnoId] = {};
     if(!cacheRegistros[turnoId].filas) cacheRegistros[turnoId].filas = {};
     if(!cacheRegistros[turnoId].filas[filaId]) cacheRegistros[turnoId].filas[filaId] = {};
-    cacheRegistros[turnoId].filas[filaId][campo] = valor;
+    var f = cacheRegistros[turnoId].filas[filaId];
+    if(!f.unidades || typeof f.unidades !== "object") f.unidades = {};
+    return f.unidades;
   }
-  var guardarPlacaFila = debounce(function(v){
-    db.ref(rutaRegistro("filas/" + estado.filaBackus + "/placa")).set(v);
-  }, 400);
-  document.getElementById("fb-placa").addEventListener("input", function(){
-    var pos = this.selectionStart;
-    var v = this.value.toUpperCase().replace(/[^A-Z0-9\- ]/g, "");
-    this.value = v;
-    try{ this.setSelectionRange(pos, pos); }catch(e){}
-    guardarCampoFilaLocal("placa", v.trim());
-    guardarPlacaFila(v.trim());
-    actualizarMensajeFila();
-  });
-  document.getElementById("fb-motivo-nd").addEventListener("change", function(){
-    guardarCampoFilaLocal("motivoNoDisp", this.value);
-    db.ref(rutaRegistro("filas/" + estado.filaBackus + "/motivoNoDisp")).set(this.value);
-    actualizarMensajeFila();
+  var temporizadoresUnidad = {};
+  function escribirCampoUnidad(id, campo, valor, inmediato){
+    var u = cacheFilaUnidades();
+    if(!u[id]) u[id] = {};
+    u[id][campo] = valor;
+    var ruta = rutaRegistro("filas/" + estado.filaBackus + "/unidades/" + id + "/" + campo);
+    var clave = ruta;
+    if(temporizadoresUnidad[clave]) clearTimeout(temporizadoresUnidad[clave]);
+    function enviar(){ db.ref(ruta).set(valor); }
+    if(inmediato) enviar(); else temporizadoresUnidad[clave] = setTimeout(enviar, 400);
+  }
+  function avisoUnidad(u){
+    if(unidadCompleta(u)) return "";
+    var f = [];
+    if(!/^[0-9]{5}$/.test(u.transporte)) f.push("transporte (5 n\u00fameros)");
+    if(!String(u.placa).trim()) f.push("placa");
+    if(!u.tipo) f.push("tipo");
+    if(!u.motivo) f.push("motivo");
+    return "Incompleta, no se env\u00eda hasta que tenga: " + f.join(", ");
+  }
+  function opcionesSelect(lista, actual){
+    return '<option value=""></option>' + lista.map(function(o){
+      return '<option value="' + escapeAttr(o) + '"' + (o === actual ? " selected" : "") + '>' + escapeAttr(o) + '</option>';
+    }).join("");
+  }
+  function renderUnidadesFila(forzar){
+    var cont = document.getElementById("fb-unidades-lista");
+    if(!cont) return;
+    if(!forzar){
+      var ae = document.activeElement;
+      if(ae && cont.contains(ae)) return; // no interrumpir mientras escribe/elige
+    }
+    var freg = registroFilaActual(estado.filaBackus);
+    cont.innerHTML = "";
+    if(!freg.unidades.length){
+      cont.innerHTML = '<div class="hist-empty">Sin unidades pendientes.</div>';
+      return;
+    }
+    freg.unidades.forEach(function(u, n){
+      var card = document.createElement("div");
+      card.className = "unidad-card";
+      card.dataset.id = u.id;
+      card.innerHTML =
+        '<div class="unidad-top"><span class="unidad-num">Unidad ' + (n+1) + '</span>' +
+          '<button type="button" class="unidad-quitar">Quitar</button></div>' +
+        '<div class="unidad-fila">' +
+          '<div><label>Transporte</label><div class="unidad-transp"><span>T-</span>' +
+            '<input class="unidad-input" data-campo="transporte" inputmode="numeric" maxlength="5" placeholder="77269" autocomplete="off" value="' + escapeAttr(u.transporte) + '"></div></div>' +
+          '<div><label>Placa</label>' +
+            '<input class="unidad-input" data-campo="placa" maxlength="10" placeholder="Q802" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;" value="' + escapeAttr(u.placa) + '"></div>' +
+        '</div>' +
+        '<div class="unidad-fila">' +
+          '<div><label>Tipo</label><select class="obs-select" data-campo="tipo">' + opcionesSelect(UNIDAD_TIPOS, u.tipo) + '</select></div>' +
+          '<div><label>Motivo</label><select class="obs-select" data-campo="motivo">' + opcionesSelect(UNIDAD_MOTIVOS, u.motivo) + '</select></div>' +
+        '</div>' +
+        '<div class="unidad-aviso">' + escapeAttr(avisoUnidad(u)) + '</div>';
+      cont.appendChild(card);
+    });
+    function leerUnidad(card){
+      var o = { transporte:"", placa:"", tipo:"", motivo:"" };
+      card.querySelectorAll("[data-campo]").forEach(function(el){ o[el.dataset.campo] = el.value; });
+      return o;
+    }
+    cont.querySelectorAll(".unidad-card").forEach(function(card){
+      var id = card.dataset.id;
+      card.querySelectorAll("input[data-campo]").forEach(function(inp){
+        inp.addEventListener("input", function(){
+          var campo = this.dataset.campo;
+          if(campo === "transporte") this.value = this.value.replace(/[^0-9]/g, "").slice(0, 5);
+          else this.value = this.value.toUpperCase().replace(/[^A-Z0-9\- ]/g, "");
+          var valor = this.value.trim();
+          escribirCampoUnidad(id, campo, valor, false);
+          card.querySelector(".unidad-aviso").textContent = avisoUnidad(leerUnidad(card));
+        });
+      });
+      card.querySelectorAll("select[data-campo]").forEach(function(sel){
+        sel.addEventListener("change", function(){
+          escribirCampoUnidad(id, this.dataset.campo, this.value, true);
+          card.querySelector(".unidad-aviso").textContent = avisoUnidad(leerUnidad(card));
+        });
+      });
+      card.querySelector(".unidad-quitar").addEventListener("click", function(){
+        delete cacheFilaUnidades()[id];
+        db.ref(rutaRegistro("filas/" + estado.filaBackus + "/unidades/" + id)).remove();
+        renderUnidadesFila(true);
+      });
+    });
+  }
+  document.getElementById("fb-unidad-agregar").addEventListener("click", function(){
+    var ref = db.ref(rutaRegistro("filas/" + estado.filaBackus + "/unidades")).push();
+    var vacia = { transporte:"", placa:"", tipo:"", motivo:"" };
+    cacheFilaUnidades()[ref.key] = Object.assign({}, vacia);
+    ref.set(vacia);
+    renderUnidadesFila(true);
   });
 
   function renderFilaBackus(){
@@ -1972,10 +2080,7 @@
     renderHorasGridFila();
     bindDatosHoraFila();
     renderObservacionesFila();
-    var fregND = registroFilaActual(estado.filaBackus);
-    fijarSiNoEnfocado(document.getElementById("fb-placa"), fregND.placa);
-    var selND = document.getElementById("fb-motivo-nd");
-    if(selND && document.activeElement !== selND) selND.value = fregND.motivoNoDisp;
+    renderUnidadesFila();
     actualizarMensajeFila();
     actualizarUIPlanAccionFila();
     verificarAlarma();
@@ -2003,6 +2108,16 @@
         '<span class="hist-info">' + (obs ? escapeAttr(obs) : 'Sin observaci\u00f3n') + '</span>' +
         '<span class="hist-pct" style="color:var(--amber);">' + total + '</span>';
       cont.appendChild(item);
+      var completas = freg.unidades.filter(unidadCompleta);
+      if(completas.length){
+        var det = document.createElement("div");
+        det.style.cssText = "padding:2px 4px 10px 4px;font-size:11px;color:var(--text-soft);font-family:'Roboto Mono',monospace;line-height:1.6;border-bottom:1px solid var(--border);";
+        det.innerHTML = '<div style="color:var(--amber);font-weight:700;">UNIDADES PENDIENTES</div>' +
+          completas.map(function(u){
+            return escapeAttr("T-" + u.transporte + " - " + String(u.placa).toUpperCase() + " - " + u.tipo + " - " + String(u.motivo).toLowerCase());
+          }).join("<br>");
+        cont.appendChild(det);
+      }
     });
   }
 
