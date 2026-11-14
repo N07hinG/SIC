@@ -955,7 +955,7 @@
   }
   // Unidades pendientes de una fila: objeto {idPush: {transporte, placa, tipo, motivo}}
   var UNIDAD_TIPOS = ["Makro","Tottus","Ajiles","HxH","Productores","Bloque 1","Bloque Final","BF"];
-  var UNIDAD_MOTIVOS = ["En Taller","En Ruta","Sin Llave","Estructura Da\u00f1ada","Cortina Da\u00f1ado"];
+  var UNIDAD_MOTIVOS = ["En Taller","En Ruta","Sin Llave","Estructura Da\u00f1ada","Cortina Da\u00f1ado","Sin Bater\u00eda","Cambio de Viaje"];
   function normalizarUnidades(u){
     if(!u || typeof u !== "object") return [];
     return Object.keys(u).sort().map(function(id){
